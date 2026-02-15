@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+
+	"github.com/lakshaymaurya-felt/winmole/internal/envutil"
 )
 
 // defaultPatterns are the initial whitelist entries that protect common
@@ -86,12 +88,50 @@ func (w *Whitelist) Save() error {
 	return nil
 }
 
+// validatePattern rejects dangerously broad whitelist patterns that would
+// silently prevent all (or most) cleanup operations.
+func validatePattern(pattern string) error {
+	cleaned := strings.TrimSpace(pattern)
+
+	// 1. Reject wildcard-only patterns.
+	if cleaned == "*" || cleaned == "**" {
+		return fmt.Errorf("pattern is too broad and would match everything: %s", pattern)
+	}
+
+	// 2. Reject drive roots and drive root wildcards (e.g., C:\, C:, C:\*).
+	if len(cleaned) >= 2 && cleaned[1] == ':' {
+		first := cleaned[0]
+		if (first >= 'A' && first <= 'Z') || (first >= 'a' && first <= 'z') {
+			rest := ""
+			if len(cleaned) > 2 {
+				rest = cleaned[2:]
+			}
+			if rest == "" || rest == `\` || rest == "/" || rest == `\*` || rest == "/*" {
+				return fmt.Errorf("pattern is a drive root and too dangerous: %s", pattern)
+			}
+		}
+	}
+
+	// 3. Require at least 2 path separators to avoid overly broad patterns.
+	sepCount := strings.Count(cleaned, `\`) + strings.Count(cleaned, "/")
+	if sepCount < 2 {
+		return fmt.Errorf("pattern has fewer than 2 path separators and is too broad: %s", pattern)
+	}
+
+	return nil
+}
+
 // Add appends a new pattern to the whitelist.
-// Returns an error if the pattern already exists.
+// Returns an error if the pattern already exists or is dangerously broad.
 func (w *Whitelist) Add(pattern string) error {
 	pattern = strings.TrimSpace(pattern)
 	if pattern == "" {
 		return fmt.Errorf("pattern cannot be empty")
+	}
+
+	// Validate pattern is not dangerously broad.
+	if err := validatePattern(pattern); err != nil {
+		return err
 	}
 
 	w.mu.Lock()
@@ -138,7 +178,7 @@ func (w *Whitelist) IsWhitelisted(path string) bool {
 	cleaned := filepath.Clean(path)
 
 	for _, pattern := range w.patterns {
-		expanded := os.ExpandEnv(pattern)
+		expanded := envutil.ExpandWindowsEnv(pattern)
 		expanded = filepath.Clean(expanded)
 
 		// Exact match (case-insensitive).

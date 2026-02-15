@@ -211,6 +211,12 @@ func (m ProgressBarModel) View() string {
 	}
 
 	pct := m.percent()
+
+	// For extremely narrow terminals, show only the percentage.
+	if m.width < 40 {
+		return fmt.Sprintf("  %3d%%", int(pct*100))
+	}
+
 	pctStr := fmt.Sprintf("%3d%%", int(pct*100))
 
 	// Byte counts.
@@ -220,11 +226,15 @@ func (m ProgressBarModel) View() string {
 	// Label (truncate if too long).
 	label := m.label
 	maxLabelWidth := m.width - m.bar.Width - 30
-	if maxLabelWidth < 0 {
-		maxLabelWidth = 20
+	if maxLabelWidth < 10 {
+		maxLabelWidth = 10
 	}
 	if len(label) > maxLabelWidth {
-		label = label[:maxLabelWidth-1] + "…"
+		if maxLabelWidth <= 1 {
+			label = "…"
+		} else {
+			label = label[:maxLabelWidth-1] + "…"
+		}
 	}
 
 	pctStyle := lipgloss.NewStyle().Foreground(ColorPrimary).Bold(true)
@@ -256,10 +266,11 @@ func (m ProgressBarModel) View() string {
 // current terminal line. Safe for use in non-Bubbletea contexts (e.g., during
 // sequential CLI operations).
 type InlineSpinner struct {
-	message string
-	stop    chan struct{}
-	done    chan struct{}
-	mu      sync.Mutex
+	message  string
+	stop     chan struct{}
+	done     chan struct{}
+	mu       sync.Mutex
+	stopOnce sync.Once
 }
 
 // NewInlineSpinner creates an InlineSpinner (does not start automatically).
@@ -315,7 +326,7 @@ func (s *InlineSpinner) UpdateMessage(message string) {
 
 // Stop halts the spinner and prints a final message on the same line.
 func (s *InlineSpinner) Stop(finalMessage string) {
-	close(s.stop)
+	s.stopOnce.Do(func() { close(s.stop) })
 	<-s.done
 
 	// Clear the spinner line and write the final message.
@@ -329,7 +340,7 @@ func (s *InlineSpinner) Stop(finalMessage string) {
 
 // StopWithError halts the spinner and prints an error message.
 func (s *InlineSpinner) StopWithError(errMessage string) {
-	close(s.stop)
+	s.stopOnce.Do(func() { close(s.stop) })
 	<-s.done
 
 	cross := lipgloss.NewStyle().

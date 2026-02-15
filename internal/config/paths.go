@@ -3,6 +3,8 @@ package config
 import (
 	"os"
 	"path/filepath"
+
+	"github.com/lakshaymaurya-felt/winmole/internal/envutil"
 )
 
 // CleanTarget represents a category of files that can be cleaned.
@@ -26,9 +28,10 @@ type CleanTarget struct {
 	RiskLevel string
 }
 
-// expand resolves environment variables in a path.
+// expand resolves environment variables in a path, supporting both
+// Windows %VAR% and Unix $VAR / ${VAR} syntax.
 func expand(path string) string {
-	return os.ExpandEnv(path)
+	return envutil.ExpandWindowsEnv(path)
 }
 
 // userProfile returns the user profile directory.
@@ -103,7 +106,9 @@ func GetCleanTargets() []CleanTarget {
 		{
 			Name: "FirefoxCache",
 			Paths: []string{
-				filepath.Join(local, "Mozilla", "Firefox", "Profiles"),
+				filepath.Join(local, "Mozilla", "Firefox", "Profiles", "*", "cache2"),
+				filepath.Join(local, "Mozilla", "Firefox", "Profiles", "*", "startupCache"),
+				filepath.Join(local, "Mozilla", "Firefox", "Profiles", "*", "thumbnails"),
 			},
 			Description:   "Mozilla Firefox browser cache (cache2 within profiles)",
 			RequiresAdmin: false,
@@ -193,7 +198,9 @@ func GetCleanTargets() []CleanTarget {
 		{
 			Name: "JetBrainsCache",
 			Paths: []string{
-				filepath.Join(local, "JetBrains"),
+				filepath.Join(local, "JetBrains", "*", "caches"),
+				filepath.Join(local, "JetBrains", "*", "log"),
+				filepath.Join(local, "JetBrains", "*", "tmp"),
 			},
 			Description:   "JetBrains IDE caches (IntelliJ, GoLand, etc.)",
 			RequiresAdmin: false,
@@ -329,7 +336,9 @@ func GetTargetsByCategory(category string) []CleanTarget {
 // circumstances. This list is hardcoded and not configurable.
 func GetNeverDeletePaths() []string {
 	return []string{
+		`C:\Windows`,
 		`C:\Windows\System32`,
+		`C:\Windows\SysWOW64`,
 		`C:\Windows\WinSxS`,
 		`C:\Windows\assembly`,
 		`C:\Windows\System32\config`,
@@ -338,6 +347,9 @@ func GetNeverDeletePaths() []string {
 		`C:\EFI`,
 		`C:\Program Files`,
 		`C:\Program Files (x86)`,
+		`C:\Users`,
+		`C:\ProgramData`,
+		`C:\Recovery`,
 		`C:\Windows\Installer`,
 		`C:\Windows\servicing`,
 		`C:\Windows\Prefetch`,

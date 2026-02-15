@@ -215,6 +215,13 @@ func FormatPathWidth(path string, maxWidth int) string {
 	// Normalize separators for display.
 	display := filepath.ToSlash(path)
 
+	if maxWidth <= 0 {
+		return ""
+	}
+	if maxWidth <= 3 {
+		return MutedStyle().Render("…")
+	}
+
 	if len(display) <= maxWidth {
 		return MutedStyle().Render(display)
 	}

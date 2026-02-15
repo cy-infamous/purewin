@@ -112,6 +112,21 @@ func SafeDelete(path string, dryRun bool) (int64, error) {
 	return 0, fmt.Errorf("failed to delete %s after %d attempts: %w", path, maxRetries, lastErr)
 }
 
+// SafeDeleteWithWhitelist removes a file or directory after checking
+// the user's whitelist and then performing safety validation.
+// If isWhitelisted returns true for the path, the deletion is skipped.
+// The isWhitelisted parameter is a function to avoid circular imports
+// with the whitelist package.
+// The original SafeDelete() is kept unchanged for backward compatibility.
+func SafeDeleteWithWhitelist(path string, dryRun bool, isWhitelisted func(string) bool) (int64, error) {
+	// Check whitelist BEFORE any other validation.
+	if isWhitelisted != nil && isWhitelisted(path) {
+		return 0, fmt.Errorf("path is whitelisted and will be skipped: %s", path)
+	}
+
+	return SafeDelete(path, dryRun)
+}
+
 // SafeCleanDir removes files matching a glob pattern within a directory.
 // Returns total bytes freed and number of files deleted.
 func SafeCleanDir(dir string, pattern string, dryRun bool) (int64, int, error) {

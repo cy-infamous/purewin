@@ -8,6 +8,7 @@ import (
 	"unicode"
 
 	"github.com/lakshaymaurya-felt/winmole/internal/config"
+	"github.com/lakshaymaurya-felt/winmole/internal/envutil"
 )
 
 // IsSafePath returns true if the given path is NOT in the NEVER_DELETE list.
@@ -39,6 +40,12 @@ func ValidatePath(path string) error {
 	// 2. Must be absolute.
 	if !filepath.IsAbs(path) {
 		return fmt.Errorf("path must be absolute, got: %s", path)
+	}
+
+	// 2.5. Reject drive roots (e.g., C:\ or C:).
+	cleaned := filepath.Clean(path)
+	if len(cleaned) >= 2 && len(cleaned) <= 3 && cleaned[1] == ':' && unicode.IsLetter(rune(cleaned[0])) {
+		return fmt.Errorf("path is a drive root and cannot be operated on: %s", path)
 	}
 
 	// 3. No path traversal components.
@@ -80,7 +87,7 @@ func ValidatePath(path string) error {
 func IsPathProtected(path string, whitelist []string) bool {
 	cleaned := filepath.Clean(path)
 	for _, pattern := range whitelist {
-		expandedPattern := os.ExpandEnv(pattern)
+		expandedPattern := envutil.ExpandWindowsEnv(pattern)
 		expandedPattern = filepath.Clean(expandedPattern)
 
 		// Try exact match (case-insensitive).

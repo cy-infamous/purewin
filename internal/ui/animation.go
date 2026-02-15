@@ -8,6 +8,7 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/mattn/go-isatty"
+	"golang.org/x/sys/windows"
 )
 
 // ─── ASCII Mole Art ──────────────────────────────────────────────────────────
@@ -46,6 +47,15 @@ func isTerminal() bool {
 	return isatty.IsTerminal(os.Stdout.Fd()) || isatty.IsCygwinTerminal(os.Stdout.Fd())
 }
 
+// enableVTProcessing enables Virtual Terminal Processing on the Windows console
+// so that ANSI escape codes work in cmd.exe and older PowerShell versions.
+func enableVTProcessing() {
+	stdout := windows.Handle(os.Stdout.Fd())
+	var mode uint32
+	_ = windows.GetConsoleMode(stdout, &mode)
+	_ = windows.SetConsoleMode(stdout, mode|windows.ENABLE_VIRTUAL_TERMINAL_PROCESSING)
+}
+
 // ─── Intro Animation ─────────────────────────────────────────────────────────
 
 // ShowMoleIntro displays an animated mole appearing line-by-line.
@@ -55,6 +65,9 @@ func ShowMoleIntro() {
 	if !isTerminal() {
 		return
 	}
+
+	// Ensure ANSI escape sequences work on Windows consoles.
+	enableVTProcessing()
 
 	moleStyle := lipgloss.NewStyle().Foreground(ColorPurple)
 	groundStyle := lipgloss.NewStyle().Foreground(ColorPrimary)
