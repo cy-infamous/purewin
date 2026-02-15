@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"os"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
 
 	"github.com/lakshaymaurya-felt/winmole/internal/core"
+	"github.com/lakshaymaurya-felt/winmole/internal/shell"
 	"github.com/lakshaymaurya-felt/winmole/internal/ui"
 )
 
@@ -90,29 +92,60 @@ func init() {
 	rootCmd.AddCommand(versionCmd)
 }
 
-// runInteractiveMenu launches the full-screen interactive main menu.
-// It shows the mole intro animation, then enters a bubbletea alt-screen
-// menu. When the user selects a command, it exits bubbletea and executes
-// the corresponding cobra subcommand.
+// runInteractiveShell launches the persistent interactive shell with
+// slash-command autocomplete. The shell runs in a loop: each iteration
+// runs a bubbletea program; when the user invokes a command, the shell
+// exits, the command runs with full terminal control, then the shell
+// relaunches with preserved state (output history, command history).
+func runInteractiveShell() {
+	m := shell.NewShellModel(appVersion)
+
+	// Add welcome output on first launch.
+	m.AppendOutput("")
+
+	for {
+		p := tea.NewProgram(m)
+		finalModel, err := p.Run()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "%s Shell error: %v\n", ui.IconError, err)
+			os.Exit(1)
+		}
+
+		result, ok := finalModel.(shell.ShellModel)
+		if !ok {
+			return
+		}
+
+		// User quit the shell entirely.
+		if result.Quitting {
+			return
+		}
+
+		// Command dispatch: run the cobra subcommand with full terminal control.
+		if result.ExecCmd != "" {
+			cmdArgs := append([]string{result.ExecCmd}, result.ExecArgs...)
+			result.AppendOutput("")
+
+			// Run the subcommand via cobra.
+			rootCmd.SetArgs(cmdArgs)
+			if err := rootCmd.Execute(); err != nil {
+				result.AppendOutput("  Command failed: " + err.Error())
+			}
+
+			result.AppendOutput("")
+
+			// Clear the exec signal and relaunch shell.
+			result.ExecCmd = ""
+			result.ExecArgs = nil
+		}
+
+		// Preserve state for next iteration.
+		m = result
+	}
+}
+
+// runInteractiveMenu is kept for backward compatibility but now
+// launches the interactive shell instead of the old menu.
 func runInteractiveMenu() {
-	// Show the mole intro animation on launch.
-	ui.ShowMoleIntro()
-
-	// Run the interactive menu.
-	selected, err := runMainMenu()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "%s Menu error: %v\n", ui.IconError, err)
-		os.Exit(1)
-	}
-
-	// User quit without selecting — clean exit.
-	if selected == "" {
-		return
-	}
-
-	// Execute the selected subcommand via cobra.
-	rootCmd.SetArgs([]string{selected})
-	if err := rootCmd.Execute(); err != nil {
-		os.Exit(1)
-	}
+	runInteractiveShell()
 }
