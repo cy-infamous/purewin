@@ -167,7 +167,7 @@ func CategoryHeaderStyle() lipgloss.Style {
 // Uses binary units (KiB, MiB, GiB, TiB) for precision.
 func FormatSize(bytes int64) string {
 	const (
-		_          = iota
+		_         = iota
 		kib int64 = 1 << (10 * iota)
 		mib
 		gib

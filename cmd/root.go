@@ -5,6 +5,8 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
+
+	"github.com/lakshaymaurya-felt/winmole/internal/ui"
 )
 
 var (
@@ -33,10 +35,6 @@ var rootCmd = &cobra.Command{
 A Windows port of Mole (https://github.com/tw93/Mole).
 All-in-one toolkit for system cleanup, app uninstallation,
 disk analysis, system optimization, and live monitoring.`,
-	Run: func(cmd *cobra.Command, args []string) {
-		// When invoked without subcommand, show interactive menu
-		runInteractiveMenu()
-	},
 }
 
 // Execute runs the root command.
@@ -45,6 +43,12 @@ func Execute() error {
 }
 
 func init() {
+	// Assign Run in init() to break the initialization cycle between
+	// rootCmd and runInteractiveMenu (which references rootCmd).
+	rootCmd.Run = func(cmd *cobra.Command, args []string) {
+		runInteractiveMenu()
+	}
+
 	rootCmd.PersistentFlags().BoolVar(&debug, "debug", false, "Show detailed operation logs")
 
 	// Register all subcommands
@@ -62,11 +66,28 @@ func init() {
 }
 
 // runInteractiveMenu launches the full-screen interactive main menu.
+// It shows the mole intro animation, then enters a bubbletea alt-screen
+// menu. When the user selects a command, it exits bubbletea and executes
+// the corresponding cobra subcommand.
 func runInteractiveMenu() {
-	// Placeholder — will be implemented in T13 (interactive menu)
-	fmt.Println("WinMole - Deep clean and optimize your Windows")
-	fmt.Println("Run 'wm --help' for available commands.")
-	fmt.Println()
-	fmt.Printf("Version %s (%s) built %s\n", appVersion, appCommit, appDate)
-	os.Exit(0)
+	// Show the mole intro animation on launch.
+	ui.ShowMoleIntro()
+
+	// Run the interactive menu.
+	selected, err := runMainMenu()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "%s Menu error: %v\n", ui.IconError, err)
+		os.Exit(1)
+	}
+
+	// User quit without selecting — clean exit.
+	if selected == "" {
+		return
+	}
+
+	// Execute the selected subcommand via cobra.
+	rootCmd.SetArgs([]string{selected})
+	if err := rootCmd.Execute(); err != nil {
+		os.Exit(1)
+	}
 }

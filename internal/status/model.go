@@ -12,7 +12,7 @@ import (
 type Tab int
 
 const (
-	TabOverview   Tab = iota
+	TabOverview Tab = iota
 	TabCPU
 	TabMemory
 	TabDisk

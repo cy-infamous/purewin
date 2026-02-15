@@ -26,12 +26,12 @@ const (
 
 // ReleaseInfo holds information about a GitHub release.
 type ReleaseInfo struct {
-	TagName     string   `json:"tag_name"`
-	Name        string   `json:"name"`
-	Body        string   `json:"body"`
-	URL         string   `json:"html_url"`
-	PublishedAt string   `json:"published_at"`
-	Assets      []Asset  `json:"assets"`
+	TagName     string  `json:"tag_name"`
+	Name        string  `json:"name"`
+	Body        string  `json:"body"`
+	URL         string  `json:"html_url"`
+	PublishedAt string  `json:"published_at"`
+	Assets      []Asset `json:"assets"`
 }
 
 // Asset represents a release asset (downloadable file).
@@ -206,7 +206,7 @@ func ApplyUpdate(tempPath string) error {
 
 	// Rename current exe to .old
 	oldPath := currentExePath + ".old"
-	
+
 	// Remove any existing .old file
 	_ = os.Remove(oldPath)
 

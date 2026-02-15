@@ -104,7 +104,7 @@ type SystemMetrics struct {
 	GPU         GPUInfo        `json:"gpu"`
 	Battery     BatteryInfo    `json:"battery"`
 	Hardware    HardwareInfo   `json:"hardware"`
-	CollectedAt time.Time     `json:"collected_at"`
+	CollectedAt time.Time      `json:"collected_at"`
 }
 
 // ─── WMI helper structs ──────────────────────────────────────────────────────
