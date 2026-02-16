@@ -17,8 +17,8 @@ import (
 //
 //	"Proceed with cleanup? [y/N]: "
 func Confirm(message string) (bool, error) {
-	promptStyle := lipgloss.NewStyle().Foreground(ColorText).Bold(true)
-	hintStyle := lipgloss.NewStyle().Foreground(ColorMuted)
+	promptStyle := BoldStyle()
+	hintStyle := MutedStyle()
 
 	fmt.Printf("%s %s ",
 		promptStyle.Render(message),
@@ -43,10 +43,7 @@ func Confirm(message string) (bool, error) {
 //
 // The message is rendered in red with a warning icon and a bordered panel.
 func DangerConfirm(message string) (bool, error) {
-	warnIcon := lipgloss.NewStyle().
-		Foreground(ColorError).
-		Bold(true).
-		Render(IconWarning)
+	warnTag := TagErrorStyle().Render(" " + IconWarning + " WARNING ")
 
 	dangerMsg := lipgloss.NewStyle().
 		Foreground(ColorError).
@@ -57,18 +54,16 @@ func DangerConfirm(message string) (bool, error) {
 
 	// Print the danger panel.
 	fmt.Println()
-	fmt.Println(box.Render(fmt.Sprintf("%s  %s", warnIcon, dangerMsg)))
+	fmt.Println(box.Render(fmt.Sprintf("%s  %s", warnTag, dangerMsg)))
 	fmt.Println()
 
 	// Instruction line.
 	instructStyle := lipgloss.NewStyle().Foreground(ColorText)
-	typeStyle := lipgloss.NewStyle().Foreground(ColorError).Bold(true)
+	yesPrompt := TagErrorStyle().Render(` "yes" `)
 
-	fmt.Printf("%s %s ",
+	fmt.Printf("%s %s %s ",
 		instructStyle.Render("  Type"),
-		typeStyle.Render(`"yes"`),
-	)
-	fmt.Printf("%s ",
+		yesPrompt,
 		instructStyle.Render("to confirm:"),
 	)
 
@@ -91,7 +86,7 @@ func PressEnterToContinue(message string) {
 		message = "Press Enter to continue..."
 	}
 
-	hintStyle := lipgloss.NewStyle().Foreground(ColorMuted).Italic(true)
+	hintStyle := MutedStyle().Italic(true)
 	fmt.Printf("\n  %s ", hintStyle.Render(message))
 
 	reader := bufio.NewReader(os.Stdin)
@@ -109,11 +104,11 @@ func ChooseOption(message string, options []string) (int, error) {
 	}
 
 	// Header.
-	headerStyle := lipgloss.NewStyle().Foreground(ColorSecondary).Bold(true)
+	headerStyle := HeaderStyle()
 	fmt.Printf("\n%s\n\n", headerStyle.Render(message))
 
 	// Numbered list.
-	numStyle := lipgloss.NewStyle().Foreground(ColorPrimary).Bold(true)
+	numStyle := lipgloss.NewStyle().Foreground(ColorBorderFocus).Bold(true)
 	optStyle := lipgloss.NewStyle().Foreground(ColorText)
 
 	for i, opt := range options {

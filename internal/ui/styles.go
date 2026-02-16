@@ -28,9 +28,6 @@ var (
 	// Muted: Warm Taupe — disabled items, hints, secondary text.
 	ColorMuted = lipgloss.AdaptiveColor{Light: "#a89889", Dark: "#7d6e63"}
 
-	// Purple: Dusty Rose/Mauve — special highlights, branding accents.
-	ColorPurple = lipgloss.AdaptiveColor{Light: "#a87186", Dark: "#c9929e"}
-
 	// Surface: Warm Dark Brown — subtle background tints for panels and cards.
 	ColorSurface = lipgloss.AdaptiveColor{Light: "#f5ede4", Dark: "#2c2118"}
 
@@ -39,24 +36,58 @@ var (
 
 	// TextDim: Mocha — dimmed foreground for secondary content.
 	ColorTextDim = lipgloss.AdaptiveColor{Light: "#7d6e63", Dark: "#a89889"}
+
+	// Accent: Dusty Lavender — for tags, pills, special highlights.
+	ColorAccent = lipgloss.AdaptiveColor{Light: "#8c7aaa", Dark: "#a896c8"}
+
+	// SurfaceDark: deeper brown — for card/panel backgrounds on dark terminals.
+	ColorSurfaceDark = lipgloss.AdaptiveColor{Light: "#ede4d8", Dark: "#231a12"}
+
+	// Overlay: warm overlay — for popup/modal backgrounds.
+	ColorOverlay = lipgloss.AdaptiveColor{Light: "#e8ddd0", Dark: "#352a1f"}
+
+	// Border: warm gray — for panel borders.
+	ColorBorder = lipgloss.AdaptiveColor{Light: "#c4b8ac", Dark: "#4a4340"}
+
+	// BorderFocus: brighter — for focused panel borders.
+	ColorBorderFocus = lipgloss.AdaptiveColor{Light: "#a0724e", Dark: "#c4956a"}
+
 )
 
 // ─── Icon Constants ──────────────────────────────────────────────────────────
 // Unicode glyphs used throughout the UI for consistent visual language.
+// Crush-inspired: refined, minimal, no emoji.
 
 const (
-	IconSuccess    = "✓"
-	IconError      = "✗"
-	IconWarning    = "⚠"
-	IconArrow      = "➤"
-	IconSelected   = "●"
-	IconUnselected = "○"
-	IconBullet     = "•"
-	IconDash       = "─"
-	IconCorner     = "└"
-	IconPipe       = "│"
-	IconFolder     = "📁"
-	IconTrash      = "🗑"
+	// Core icons
+	IconCheck     = "✓"
+	IconCross     = "×"
+	IconWarning   = "!"
+	IconArrow     = "→"
+	IconDot       = "●"
+	IconCircle    = "○"
+	IconBullet    = "•"
+	IconDash      = "─"
+	IconCorner    = "└"
+	IconPipe      = "│"
+	IconFolder    = "◆"
+	IconTrash     = "✕"
+	IconPending   = "⋯"
+	IconDiamond   = "◇"
+	IconChevron   = "›"
+	IconBlock     = "▌"
+	IconRadioOn   = "◉"
+	IconRadioOff  = IconCircle
+	IconReload    = "⟳"
+	IconHelp      = "?"
+	IconPrompt    = "❯"
+	IconDashLight = "╌"
+
+	// Backward compatibility aliases
+	IconSuccess    = IconCheck
+	IconError      = IconCross
+	IconSelected   = IconDot
+	IconUnselected = IconCircle
 )
 
 // SpinnerFrames contains the braille-dot animation sequence for spinners.
@@ -89,11 +120,6 @@ func InfoStyle() lipgloss.Style {
 // MutedStyle renders text in warm taupe.
 func MutedStyle() lipgloss.Style {
 	return lipgloss.NewStyle().Foreground(ColorMuted)
-}
-
-// PurpleStyle renders text in dusty rose.
-func PurpleStyle() lipgloss.Style {
-	return lipgloss.NewStyle().Foreground(ColorPurple)
 }
 
 // HeaderStyle renders bold, caramel header text with a bottom margin.
@@ -161,6 +187,114 @@ func CategoryHeaderStyle() lipgloss.Style {
 		PaddingLeft(1)
 }
 
+// ─── Premium Styles ──────────────────────────────────────────────────────────
+// Crush-inspired panel, card, tag, and gradient helpers for the TUI overhaul.
+
+// PanelStyle renders a rounded-border panel with subtle border color.
+func PanelStyle() lipgloss.Style {
+	return lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(ColorBorder).
+		Padding(1, 2)
+}
+
+// PanelFocusedStyle renders a panel with the focus border color.
+func PanelFocusedStyle() lipgloss.Style {
+	return lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(ColorBorderFocus).
+		Padding(1, 2)
+}
+
+// CardStyle renders a card with rounded border and minimal padding.
+func CardStyle() lipgloss.Style {
+	return lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(ColorBorder).
+		Padding(0, 2)
+}
+
+// TagStyle renders a small tag/pill with background color and padding.
+func TagStyle() lipgloss.Style {
+	return lipgloss.NewStyle().
+		Foreground(ColorText).
+		Background(ColorSurface).
+		Padding(0, 1)
+}
+
+// TagAccentStyle renders an accent-colored tag.
+func TagAccentStyle() lipgloss.Style {
+	return lipgloss.NewStyle().
+		Foreground(ColorText).
+		Background(ColorAccent).
+		Padding(0, 1).
+		Bold(true)
+}
+
+// TagErrorStyle renders an error tag with error background.
+func TagErrorStyle() lipgloss.Style {
+	return lipgloss.NewStyle().
+		Foreground(ColorText).
+		Background(ColorError).
+		Padding(0, 1).
+		Bold(true)
+}
+
+// TagWarningStyle renders a warning tag.
+func TagWarningStyle() lipgloss.Style {
+	return lipgloss.NewStyle().
+		Foreground(ColorSurfaceDark).
+		Background(ColorWarning).
+		Padding(0, 1).
+		Bold(true)
+}
+
+// SectionHeader renders: "── Label ──────────" at the given width.
+func SectionHeader(label string, width int) string {
+	styled := lipgloss.NewStyle().Foreground(ColorSecondary).Bold(true).Render(label)
+	labelW := lipgloss.Width(styled)
+	pre := "── "
+	remaining := width - labelW - len(pre) - 1
+	if remaining < 0 {
+		remaining = 0
+	}
+	suf := " " + strings.Repeat("─", remaining)
+	return MutedStyle().Render(pre) + styled + MutedStyle().Render(suf)
+}
+
+// GradientBar renders a filled/empty bar with color that shifts based on percentage.
+func GradientBar(pct float64, width int) string {
+	if pct < 0 {
+		pct = 0
+	}
+	if pct > 100 {
+		pct = 100
+	}
+	filled := int(pct / 100 * float64(width))
+	if filled > width {
+		filled = width
+	}
+
+	barColor := ColorPrimary
+	if pct >= 90 {
+		barColor = ColorError
+	} else if pct >= 70 {
+		barColor = ColorWarning
+	}
+
+	fStr := lipgloss.NewStyle().Foreground(barColor).Render(strings.Repeat("█", filled))
+	eStr := MutedStyle().Render(strings.Repeat("░", width-filled))
+	return fStr + eStr
+}
+
+// FocusBorder returns a left-border style for focused items (crush-style thick bar).
+func FocusBorder() lipgloss.Style {
+	return lipgloss.NewStyle().
+		Border(lipgloss.Border{Left: IconBlock}, false, false, false, true).
+		BorderForeground(ColorPrimary).
+		PaddingLeft(1)
+}
+
 // ─── Formatting Helpers ──────────────────────────────────────────────────────
 
 // FormatSize returns a human-readable, styled file-size string.
@@ -200,6 +334,29 @@ func FormatSize(bytes int64) string {
 	}
 
 	return style.Render(size)
+}
+
+// FormatSizePlain returns a human-readable file-size string without any styling.
+func FormatSizePlain(bytes int64) string {
+	const (
+		_         = iota
+		kib int64 = 1 << (10 * iota)
+		mib
+		gib
+		tib
+	)
+	switch {
+	case bytes >= tib:
+		return fmt.Sprintf("%.1f TiB", float64(bytes)/float64(tib))
+	case bytes >= gib:
+		return fmt.Sprintf("%.1f GiB", float64(bytes)/float64(gib))
+	case bytes >= mib:
+		return fmt.Sprintf("%.1f MiB", float64(bytes)/float64(mib))
+	case bytes >= kib:
+		return fmt.Sprintf("%.1f KiB", float64(bytes)/float64(kib))
+	default:
+		return fmt.Sprintf("%d B", bytes)
+	}
 }
 
 // FormatPath truncates and styles a filesystem path to fit within maxWidth.

@@ -9,38 +9,17 @@ import (
 	"github.com/lakshaymaurya-felt/winmole/internal/ui"
 )
 
-// ─── Vercel-Inspired Cappuccino Palette ──────────────────────────────────────
-// Minimal color usage: cream text on dark, ONE pastel accent, muted chrome.
-// No red/green/yellow/blue primaries. Everything is warm and restrained.
+// ─── Reusable Styles ─────────────────────────────────────────────────────────
+// Use ui package colors for consistency across all views.
 
-var (
-	// accent: dusty mauve — the single pastel highlight color.
-	accent = lipgloss.AdaptiveColor{Light: "#8c6f7e", Dark: "#b89aab"}
-
-	// accentAlt: warm periwinkle — secondary accent for contrast.
-	accentAlt = lipgloss.AdaptiveColor{Light: "#7a7899", Dark: "#a3a1be"}
-
-	// dim: warm gray — borders, labels, inactive elements, chrome.
-	dim = lipgloss.AdaptiveColor{Light: "#8a7e76", Dark: "#6b6360"}
-
-	// subtle: slightly brighter warm gray — secondary data.
-	subtle = lipgloss.AdaptiveColor{Light: "#7d6e63", Dark: "#8a7e76"}
-
-	// alert: muted coral — ONLY for critical states (>=90%).
-	alert = lipgloss.AdaptiveColor{Light: "#b07068", Dark: "#c4887f"}
-)
-
-// Reusable styles.
+// Module-level style vars (safe: lipgloss styles are immutable copies).
 var (
 	textStyle   = lipgloss.NewStyle().Foreground(ui.ColorText)
-	dimStyle    = lipgloss.NewStyle().Foreground(dim)
-	subtleStyle = lipgloss.NewStyle().Foreground(subtle)
-	accentStyle = lipgloss.NewStyle().Foreground(accent)
-	altStyle    = lipgloss.NewStyle().Foreground(accentAlt)
-	alertStyle  = lipgloss.NewStyle().Foreground(alert)
+	dimStyle    = lipgloss.NewStyle().Foreground(ui.ColorMuted)
+	subtleStyle = lipgloss.NewStyle().Foreground(ui.ColorTextDim)
+	accentStyle = lipgloss.NewStyle().Foreground(ui.ColorPrimary)
+	altStyle = lipgloss.NewStyle().Foreground(ui.ColorAccent)
 )
-
-// Old palette removed — using Vercel-inspired minimal palette above.
 
 // ─── Top-level renderer ─────────────────────────────────────────────────────
 
@@ -88,25 +67,27 @@ func (m StatusModel) renderTabs(w int) string {
 		Foreground(ui.ColorText).
 		Bold(true).
 		Border(lipgloss.NormalBorder(), false, false, true, false).
-		BorderForeground(accent).
+		BorderForeground(ui.ColorBorderFocus).
 		Padding(0, 2)
 
 	inactiveTab := lipgloss.NewStyle().
-		Foreground(dim).
+		Foreground(ui.ColorMuted).
 		Padding(0, 2)
 
 	var tabs []string
 	for i, name := range TabNames {
-		label := fmt.Sprintf("%d·%s", i+1, name)
+		var label string
 		if Tab(i) == m.Tab {
+			label = fmt.Sprintf("%s %d·%s", ui.IconDot, i+1, name)
 			tabs = append(tabs, activeTab.Render(label))
 		} else {
+			label = fmt.Sprintf("  %d·%s", i+1, name)
 			tabs = append(tabs, inactiveTab.Render(label))
 		}
 	}
 
 	bar := lipgloss.JoinHorizontal(lipgloss.Bottom, tabs...)
-	rule := dimStyle.Render(strings.Repeat("─", w))
+	rule := ui.Divider(w)
 
 	return bar + "\n" + rule
 }
@@ -120,26 +101,26 @@ func (m StatusModel) renderOverview(w int) string {
 	var s strings.Builder
 	s.WriteString("\n")
 
-	// ── Health Score (single line, minimal) ──
-	scoreStyle := accentStyle.Bold(true)
-	if score < 50 {
-		scoreStyle = alertStyle.Bold(true)
-	}
+	// ── Health Score (tag style) ──
 	scoreLabel := "Excellent"
+	scoreTag := ui.TagAccentStyle()
 	switch {
 	case score < 50:
 		scoreLabel = "Critical"
+		scoreTag = ui.TagErrorStyle()
 	case score < 70:
 		scoreLabel = "Fair"
+		scoreTag = ui.TagWarningStyle()
 	case score < 90:
 		scoreLabel = "Good"
 	}
 	s.WriteString(fmt.Sprintf("  %s  %s\n",
-		scoreStyle.Render(fmt.Sprintf("%d", score)),
+		scoreTag.Render(fmt.Sprintf(" %d ", score)),
 		dimStyle.Render(scoreLabel)))
 	s.WriteString("\n")
 
-	// ── Hardware (condensed, 2 lines) ──
+	// ── System ──
+	s.WriteString("  " + ui.SectionHeader("System", w-4) + "\n")
 	hw := met.Hardware
 	hwLine1 := fmt.Sprintf("  %s  %s  %s",
 		textStyle.Render(hw.Hostname),
@@ -169,10 +150,9 @@ func (m StatusModel) renderOverview(w int) string {
 	}
 
 	s.WriteString("\n")
-	s.WriteString(dimStyle.Render("  "+strings.Repeat("─", w-4)) + "\n")
-	s.WriteString("\n")
 
-	// ── Metrics with inline sparklines ──
+	// ── Resources ──
+	s.WriteString("  " + ui.SectionHeader("Resources", w-4) + "\n")
 	barW := 20
 	sparkW := 30
 	if w > 110 {
@@ -188,7 +168,7 @@ func (m StatusModel) renderOverview(w int) string {
 	if len(m.CPUHistory) > 1 {
 		s.WriteString(fmt.Sprintf("  %s  %s\n",
 			dimStyle.Render("       "),
-			renderSparkline(m.CPUHistory, sparkW, accent)))
+			renderSparkline(m.CPUHistory, sparkW, ui.ColorPrimary)))
 	}
 	s.WriteString("\n")
 
@@ -200,7 +180,7 @@ func (m StatusModel) renderOverview(w int) string {
 	if len(m.MemHistory) > 1 {
 		s.WriteString(fmt.Sprintf("  %s  %s\n",
 			dimStyle.Render("       "),
-			renderSparkline(m.MemHistory, sparkW, accentAlt)))
+			renderSparkline(m.MemHistory, sparkW, ui.ColorAccent)))
 	}
 	s.WriteString("\n")
 
@@ -220,16 +200,16 @@ func (m StatusModel) renderOverview(w int) string {
 	netUp := formatSpeed(met.Network.SendSpeed)
 	s.WriteString(fmt.Sprintf("  %s  %s %s  %s %s\n",
 		dimStyle.Render("NET    "),
-		accentStyle.Render("↓"),
+		accentStyle.Render(ui.IconArrow),
 		textStyle.Render(netDown),
-		altStyle.Render("↑"),
+		altStyle.Render(ui.IconArrow),
 		textStyle.Render(netUp)))
 
 	if len(m.NetRecvHistory) > 1 {
 		s.WriteString(fmt.Sprintf("  %s  %s  %s\n",
 			dimStyle.Render("       "),
-			renderSparklineU64(m.NetRecvHistory, sparkW/2, accent),
-			renderSparklineU64(m.NetSendHistory, sparkW/2, accentAlt)))
+			renderSparklineU64(m.NetRecvHistory, sparkW/2, ui.ColorPrimary),
+			renderSparklineU64(m.NetSendHistory, sparkW/2, ui.ColorAccent)))
 	}
 
 	return s.String()
@@ -237,7 +217,7 @@ func (m StatusModel) renderOverview(w int) string {
 
 // renderMetricRow renders a single metric: label + bar + percent + optional detail.
 func renderMetricRow(label string, pct float64, barW int, detail string) string {
-	bar := minimalBar(pct, barW)
+	bar := ui.GradientBar(pct, barW)
 	pctStr := textStyle.Render(fmt.Sprintf("%5.1f%%", pct))
 
 	line := fmt.Sprintf("  %s  %s  %s",
@@ -263,23 +243,27 @@ func (m StatusModel) renderCPU(w int) string {
 
 	var lines []string
 	lines = append(lines, "")
-	totalLabel := accentStyle.Bold(true).Render("Total")
+
+	// ── Total ──
+	lines = append(lines, "  "+ui.SectionHeader("Total", barW+20))
+	totalLabel := accentStyle.Bold(true).Render("CPU")
 	totalPct := textStyle.Render(fmt.Sprintf("%5.1f%%", met.CPU.TotalPercent))
 	lines = append(lines,
-		fmt.Sprintf("  %s  %s  %s", totalLabel, minimalBar(met.CPU.TotalPercent, barW), totalPct))
+		fmt.Sprintf("  %s  %s  %s", totalLabel, ui.GradientBar(met.CPU.TotalPercent, barW), totalPct))
 	lines = append(lines, "")
 
 	// Sparkline history.
 	if len(m.CPUHistory) > 1 {
-		spark := renderSparkline(m.CPUHistory, 30, accent)
+		spark := renderSparkline(m.CPUHistory, 30, ui.ColorPrimary)
 		histLabel := altStyle.Render("  History  ")
 		lines = append(lines, histLabel+spark)
 		lines = append(lines, "")
 	}
 
-	// Per-core bars.
+	// ── Per Core ──
+	lines = append(lines, "  "+ui.SectionHeader("Per Core", barW+20))
 	for i, pct := range met.CPU.PerCore {
-		coreBar := minimalBar(pct, barW-10)
+		coreBar := ui.GradientBar(pct, barW-10)
 		lines = append(lines,
 			fmt.Sprintf("  %s  %s  %s",
 				dimStyle.Render(fmt.Sprintf("Core %-2d", i)),
@@ -305,16 +289,19 @@ func (m StatusModel) renderMemory(w int) string {
 
 	var lines []string
 	lines = append(lines, "")
+
+	// ── Physical ──
+	lines = append(lines, "  "+ui.SectionHeader("Physical", barW+20))
 	lines = append(lines,
 		fmt.Sprintf("  %s  %s  %s",
 			ml.Bold(true).Render("Used      "),
-			minimalBar(met.Memory.UsedPercent, barW),
+			ui.GradientBar(met.Memory.UsedPercent, barW),
 			mp.Render(fmt.Sprintf("%5.1f%%", met.Memory.UsedPercent))))
 	lines = append(lines, "")
 
 	// Sparkline history.
 	if len(m.MemHistory) > 1 {
-		spark := renderSparkline(m.MemHistory, 30, accentAlt)
+		spark := renderSparkline(m.MemHistory, 30, ui.ColorAccent)
 		histLabel := altStyle.Render("  History  ")
 		lines = append(lines, histLabel+spark)
 		lines = append(lines, "")
@@ -330,10 +317,12 @@ func (m StatusModel) renderMemory(w int) string {
 
 	if met.Memory.SwapTotal > 0 {
 		lines = append(lines, "")
+		// ── Swap ──
+		lines = append(lines, "  "+ui.SectionHeader("Swap", barW+20))
 		lines = append(lines,
 			fmt.Sprintf("  %s  %s  %s",
-				ml.Bold(true).Render("Swap      "),
-				minimalBar(met.Memory.SwapPercent, barW),
+				ml.Bold(true).Render("Used      "),
+				ui.GradientBar(met.Memory.SwapPercent, barW),
 				mp.Render(fmt.Sprintf("%5.1f%%", met.Memory.SwapPercent))))
 		lines = append(lines,
 			fmt.Sprintf("  %s  %s / %s",
@@ -365,15 +354,15 @@ func (m StatusModel) renderDisk(w int) string {
 		lines = append(lines,
 			fmt.Sprintf("  %s %s  %s  %s / %s",
 				dl.Render(fmt.Sprintf("%-4s", p.Path)),
-				minimalBar(p.UsedPercent, barW),
+				ui.GradientBar(p.UsedPercent, barW),
 				dp.Render(fmt.Sprintf("%5.1f%%", p.UsedPercent)),
 				dv.Render(core.FormatSize(int64(p.Used))),
 				dv.Render(core.FormatSize(int64(p.Total)))))
 	}
 
 	lines = append(lines, "")
-	rdLabel := accentStyle.Render("Read")
-	wrLabel := altStyle.Render("Write")
+	rdLabel := accentStyle.Render(ui.IconArrow + " Read")
+	wrLabel := altStyle.Render(ui.IconArrow + " Write")
 	lines = append(lines,
 		fmt.Sprintf("  %s   %s   %s  %s",
 			rdLabel, dv.Render(core.FormatSize(int64(met.Disk.ReadBytes))),
@@ -392,11 +381,11 @@ func (m StatusModel) renderNetwork(w int) string {
 
 	lines = append(lines,
 		fmt.Sprintf("  %s %s  %s",
-			accentStyle.Render("↓"), accentStyle.Render("Download"),
+			accentStyle.Render(ui.IconArrow), accentStyle.Render("Download"),
 			textStyle.Render(formatSpeed(met.Network.RecvSpeed))))
 	lines = append(lines,
 		fmt.Sprintf("  %s %s    %s",
-			altStyle.Render("↑"), altStyle.Render("Upload"),
+			altStyle.Render(ui.IconArrow), altStyle.Render("Upload"),
 			textStyle.Render(formatSpeed(met.Network.SendSpeed))))
 
 	lines = append(lines, "")
@@ -409,9 +398,9 @@ func (m StatusModel) renderNetwork(w int) string {
 	if len(m.NetRecvHistory) > 1 {
 		lines = append(lines, "")
 		lines = append(lines,
-			accentStyle.Render("  ↓ ")+renderSparklineU64(m.NetRecvHistory, 30, accent))
+			accentStyle.Render("  "+ui.IconArrow+" ")+renderSparklineU64(m.NetRecvHistory, 30, ui.ColorPrimary))
 		lines = append(lines,
-			altStyle.Render("  ↑ ")+renderSparklineU64(m.NetSendHistory, 30, accentAlt))
+			altStyle.Render("  "+ui.IconArrow+" ")+renderSparklineU64(m.NetSendHistory, 30, ui.ColorAccent))
 	}
 
 	return strings.Join(lines, "\n")
@@ -428,8 +417,7 @@ func (m StatusModel) renderProcesses(w int) string {
 
 	var lines []string
 	lines = append(lines, "")
-	lines = append(lines,
-		accentStyle.Bold(true).Render("  Top processes by CPU"))
+	lines = append(lines, "  "+ui.SectionHeader("Top Processes", w-4))
 	lines = append(lines, "")
 
 	nameW := 22
@@ -439,7 +427,7 @@ func (m StatusModel) renderProcesses(w int) string {
 
 	header := fmt.Sprintf("  %-6s %-*s %s  %6s  %6s", "PID", nameW, "Name", strings.Repeat(" ", barW), "CPU%", "Mem%")
 	lines = append(lines, dimStyle.Render(header))
-	lines = append(lines, dimStyle.Render("  "+strings.Repeat("─", w-4)))
+	lines = append(lines, "  "+ui.Divider(w-4))
 
 	for _, p := range met.TopProcs {
 		name := p.Name
@@ -450,7 +438,7 @@ func (m StatusModel) renderProcesses(w int) string {
 		if cpuClamp > 100 {
 			cpuClamp = 100
 		}
-		bar := minimalBar(cpuClamp, barW)
+		bar := ui.GradientBar(cpuClamp, barW)
 		lines = append(lines,
 			fmt.Sprintf("  %s %s %s  %s  %s",
 				subtleStyle.Render(fmt.Sprintf("%-6d", p.PID)),
@@ -472,10 +460,7 @@ func (m StatusModel) renderProcesses(w int) string {
 
 func (m StatusModel) renderStatusFooter() string {
 	hints := "  Tab/Shift-Tab switch  " + ui.IconPipe + "  1-6 jump  " + ui.IconPipe + "  q quit"
-	footer := lipgloss.NewStyle().
-		Foreground(ui.ColorMuted).
-		Italic(true).
-		Render(hints)
+	footer := ui.HintBarStyle().Render(hints)
 
 	if m.Err != nil {
 		errStr := lipgloss.NewStyle().
@@ -487,27 +472,6 @@ func (m StatusModel) renderStatusFooter() string {
 }
 
 // ─── Drawing primitives ─────────────────────────────────────────────────────
-
-// minimalBar renders a ████░░░░ bar in accent color, coral only at >=90%.
-func minimalBar(pct float64, width int) string {
-	if pct < 0 {
-		pct = 0
-	}
-	if pct > 100 {
-		pct = 100
-	}
-	filled := int(pct / 100 * float64(width))
-	if filled > width {
-		filled = width
-	}
-	barColor := accent
-	if pct >= 90 {
-		barColor = alert
-	}
-	fStr := lipgloss.NewStyle().Foreground(barColor).Render(strings.Repeat("█", filled))
-	eStr := dimStyle.Render(strings.Repeat("░", width-filled))
-	return fStr + eStr
-}
 
 // renderSparkline renders a mini chart from float64 data using block chars.
 func renderSparkline(data []float64, width int, color lipgloss.AdaptiveColor) string {

@@ -151,11 +151,11 @@ func (m MenuModel) View() string {
 		number := fmt.Sprintf("%d", i+1)
 
 		if isActive {
-			// Active row: arrow + number + bold title.
+			// Active row: block cursor + number + bold title.
 			arrow := lipgloss.NewStyle().
 				Foreground(ColorPrimary).
 				Bold(true).
-				Render(IconArrow)
+				Render(IconBlock)
 
 			num := lipgloss.NewStyle().
 				Foreground(ColorPrimary).

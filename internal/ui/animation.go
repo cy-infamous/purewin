@@ -15,18 +15,15 @@ import (
 
 // moleLines holds the raw ASCII mole art, rendered line-by-line during intro.
 var moleLines = []string{
-	`     /\_/\     `,
-	`    / o o \    `,
-	`   (  =^=  )   `,
-	`    )     (    `,
-	`   (       )   `,
-	`  ( /|   |\ )  `,
-	`   \| |_| |/   `,
-	`    \_____/    `,
+	`    ╭───────╮    `,
+	`    │ ◉   ◉ │    `,
+	`    │   ▽   │    `,
+	`    ╰──═══──╯    `,
+	`     ╱ ╲ ╱ ╲     `,
 }
 
 // groundLine is the terrain beneath the mole.
-var groundLine = `  ~~^^^~^^^~~^^^~~`
+var groundLine = `   ─────────────   `
 
 // brandBanner is the large ASCII wordmark.
 var brandLines = []string{
@@ -60,7 +57,7 @@ func enableVTProcessing() {
 
 // ShowMoleIntro displays an animated mole appearing line-by-line.
 // Only runs in interactive terminals; silently returns otherwise.
-// Dusty rose for the mole body, espresso brown for the ground.
+// Dusty lavender for the mole body, espresso brown for the ground.
 func ShowMoleIntro() {
 	if !isTerminal() {
 		return
@@ -69,7 +66,7 @@ func ShowMoleIntro() {
 	// Ensure ANSI escape sequences work on Windows consoles.
 	enableVTProcessing()
 
-	moleStyle := lipgloss.NewStyle().Foreground(ColorPurple)
+	moleStyle := lipgloss.NewStyle().Foreground(ColorAccent)
 	groundStyle := lipgloss.NewStyle().Foreground(ColorPrimary)
 
 	// Clear screen.
@@ -78,12 +75,12 @@ func ShowMoleIntro() {
 	// Animate mole body line by line.
 	for _, line := range moleLines {
 		fmt.Println(moleStyle.Render(line))
-		time.Sleep(100 * time.Millisecond)
+		time.Sleep(80 * time.Millisecond)
 	}
 
 	// Ground with a brief pause.
 	fmt.Println(groundStyle.Render(groundLine))
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(80 * time.Millisecond)
 
 	// Pause to admire the mole.
 	time.Sleep(500 * time.Millisecond)
@@ -95,13 +92,11 @@ func ShowMoleIntro() {
 // ─── Brand Banner ────────────────────────────────────────────────────────────
 
 // ShowBrandBanner returns the full ASCII brand banner as a styled string,
-// ready to be printed. Espresso wordmark, mocha tagline, caramel URL.
+// ready to be printed. Warm brown wordmark, muted tagline, info-styled URL.
 func ShowBrandBanner() string {
 	var b strings.Builder
 
-	nameStyle := lipgloss.NewStyle().Foreground(ColorPrimary).Bold(true)
-	tagStyle := lipgloss.NewStyle().Foreground(ColorTextDim).Italic(true)
-	urlStyle := lipgloss.NewStyle().Foreground(ColorSecondary)
+	nameStyle := lipgloss.NewStyle().Foreground(ColorBorderFocus).Bold(true)
 
 	// ASCII wordmark.
 	for _, line := range brandLines {
@@ -111,11 +106,11 @@ func ShowBrandBanner() string {
 	b.WriteByte('\n')
 
 	// Tagline.
-	b.WriteString(tagStyle.Render("  " + tagline))
+	b.WriteString(MutedStyle().Italic(true).Render("  " + tagline))
 	b.WriteByte('\n')
 
 	// URL / attribution.
-	b.WriteString(urlStyle.Render("  https://github.com/lakshaymaurya-felt/winmole"))
+	b.WriteString(InfoStyle().Render("  https://github.com/lakshaymaurya-felt/winmole"))
 	b.WriteByte('\n')
 
 	return b.String()
@@ -126,40 +121,24 @@ func ShowBrandBanner() string {
 // ShowCompletionBanner prints a post-operation summary with space freed,
 // current free space, and a styled checkmark.
 func ShowCompletionBanner(freed int64, freeSpace int64) {
-	checkStyle := lipgloss.NewStyle().
+	fmt.Println()
+
+	// Build content
+	var content strings.Builder
+	content.WriteString(lipgloss.NewStyle().
 		Foreground(ColorPrimary).
-		Bold(true)
+		Bold(true).
+		Render(IconCheck + " Cleanup Complete!"))
+	content.WriteString("\n\n")
+	content.WriteString(fmt.Sprintf("%s  %s\n",
+		lipgloss.NewStyle().Foreground(ColorText).Render("Space freed:"),
+		FormatSize(freed)))
+	content.WriteString(fmt.Sprintf("%s  %s",
+		lipgloss.NewStyle().Foreground(ColorText).Render("Free space: "),
+		FormatSize(freeSpace)))
 
-	labelStyle := lipgloss.NewStyle().
-		Foreground(ColorText)
-
-	dividerWidth := 48
-
-	fmt.Println()
-	fmt.Println(Divider(dividerWidth))
-	fmt.Println()
-
-	// Checkmark + headline.
-	fmt.Printf("  %s %s\n",
-		checkStyle.Render(IconSuccess),
-		checkStyle.Render("Cleanup Complete!"),
-	)
-	fmt.Println()
-
-	// Space freed.
-	fmt.Printf("  %s  %s\n",
-		labelStyle.Render("Space freed:"),
-		FormatSize(freed),
-	)
-
-	// Current free space.
-	fmt.Printf("  %s  %s\n",
-		labelStyle.Render("Free space: "),
-		FormatSize(freeSpace),
-	)
-
-	fmt.Println()
-	fmt.Println(Divider(dividerWidth))
+	// Render in card
+	fmt.Println(CardStyle().Width(50).Render(content.String()))
 	fmt.Println()
 }
 
@@ -168,7 +147,7 @@ func ShowCompletionBanner(freed int64, freeSpace int64) {
 // MoleArt returns the full mole ASCII art as a single styled string.
 // Useful for embedding in help screens or about dialogs.
 func MoleArt() string {
-	moleStyle := lipgloss.NewStyle().Foreground(ColorPurple)
+	moleStyle := lipgloss.NewStyle().Foreground(ColorAccent)
 	groundStyle := lipgloss.NewStyle().Foreground(ColorPrimary)
 
 	var b strings.Builder

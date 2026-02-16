@@ -36,7 +36,7 @@ func runRemove(cmd *cobra.Command, args []string) {
 
 	// Show removal plan
 	fmt.Println()
-	fmt.Println(ui.HeaderStyle().Render("🗑️  Remove WinMole"))
+	fmt.Println(ui.SectionHeader("Remove WinMole", 50))
 	fmt.Println()
 	fmt.Println(ui.WarningStyle().Render("  The following will be removed:"))
 	fmt.Println()
@@ -75,6 +75,6 @@ func runRemove(cmd *cobra.Command, args []string) {
 	fmt.Printf("  %s WinMole has been removed from your system.\n",
 		ui.SuccessStyle().Render(ui.IconSuccess))
 	fmt.Println()
-	fmt.Println(ui.MutedStyle().Render("  Goodbye! 👋"))
+	fmt.Println(ui.MutedStyle().Render("  Goodbye!"))
 	fmt.Println()
 }

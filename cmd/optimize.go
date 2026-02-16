@@ -53,7 +53,7 @@ func runOptimize(cmd *cobra.Command, args []string) {
 	}
 
 	fmt.Println()
-	fmt.Println(ui.HeaderStyle().Render("  System Optimization"))
+	fmt.Println(ui.SectionHeader("System Optimization", 50))
 	fmt.Println()
 
 	var results []optimizeResult
@@ -75,7 +75,7 @@ func runOptimize(cmd *cobra.Command, args []string) {
 
 // runServiceOptimizations executes service-related optimizations.
 func runServiceOptimizations() []optimizeResult {
-	fmt.Println(ui.CategoryHeaderStyle().Render("  Services"))
+	fmt.Println(ui.SectionHeader("Services", 50))
 	fmt.Println()
 
 	var results []optimizeResult
@@ -102,7 +102,7 @@ func runServiceOptimizations() []optimizeResult {
 
 // runMaintenanceOptimizations executes maintenance tasks.
 func runMaintenanceOptimizations() []optimizeResult {
-	fmt.Println(ui.CategoryHeaderStyle().Render("  Maintenance"))
+	fmt.Println(ui.SectionHeader("Maintenance", 50))
 	fmt.Println()
 
 	var results []optimizeResult

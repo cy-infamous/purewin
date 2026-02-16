@@ -46,7 +46,7 @@ func runPurge(cmd *cobra.Command, args []string) {
 
 	// Start scanning
 	fmt.Println()
-	fmt.Println(ui.HeaderStyle().Render("🔍 Project Artifact Purge"))
+	fmt.Println(ui.SectionHeader("Project Purge", 50))
 	fmt.Println()
 
 	spinner := ui.NewInlineSpinner()
@@ -72,7 +72,7 @@ func runPurge(cmd *cobra.Command, args []string) {
 
 	if len(artifacts) == 0 {
 		fmt.Println()
-		fmt.Println(ui.SuccessStyle().Render("  ✓ No project artifacts found!"))
+		fmt.Println(ui.SuccessStyle().Render(fmt.Sprintf("  %s No project artifacts found!", ui.IconCheck)))
 		fmt.Println()
 		return
 	}
@@ -99,7 +99,7 @@ func runPurge(cmd *cobra.Command, args []string) {
 	for _, item := range selected {
 		// Find the artifact by path
 		for _, artifact := range artifacts {
-			if artifact.ArtifactPath == item.Description {
+			if artifact.ArtifactPath == item.Value {
 				selectedArtifacts = append(selectedArtifacts, artifact)
 				break
 			}
@@ -234,15 +234,13 @@ func artifactsToSelectorItems(artifacts []purge.ProjectArtifact) []ui.SelectorIt
 
 			item := ui.SelectorItem{
 				Label:       label,
-				Description: artifact.ArtifactPath,
+				Description: fmt.Sprintf("%s • %s old", artifact.ArtifactPath, ageStr),
+				Value:       artifact.ArtifactPath,
 				Size:        core.FormatSize(artifact.Size),
 				Selected:    !artifact.IsRecent, // Don't select recent artifacts by default
 				Disabled:    false,
 				Category:    artifact.ArtifactType,
 			}
-
-			// Add age to description
-			item.Description = fmt.Sprintf("%s • %s old", artifact.ArtifactPath, ageStr)
 
 			items = append(items, item)
 		}

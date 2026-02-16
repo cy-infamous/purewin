@@ -10,11 +10,9 @@ import (
 
 // ─── Color tokens ────────────────────────────────────────────────────────────
 
+// Short aliases for readability in render functions.
 var (
-	clrBar     = lipgloss.AdaptiveColor{Light: "#a0724e", Dark: "#d4a574"} // Caramel bar
-	clrBarHot  = lipgloss.AdaptiveColor{Light: "#c4873b", Dark: "#e8a857"} // Warm amber
-	clrBarCrit = lipgloss.AdaptiveColor{Light: "#c9605a", Dark: "#e8877f"} // Soft coral
-	clrDim     = ui.ColorMuted
+	clrDim = ui.ColorMuted
 	clrDir     = ui.ColorSecondary
 	clrFile    = ui.ColorText
 	clrOld     = ui.ColorMuted
@@ -48,7 +46,7 @@ func (m AnalyzeModel) renderHeader(w int) string {
 	title := lipgloss.NewStyle().
 		Bold(true).
 		Foreground(ui.ColorSecondary).
-		Render("  " + ui.IconFolder + " DISK ANALYZER")
+		Render("  " + ui.IconDiamond + " Disk Analyzer")
 
 	sizeStr := ui.FormatSize(m.current.Size)
 	pathLine := lipgloss.NewStyle().
@@ -63,13 +61,13 @@ func (m AnalyzeModel) renderHeader(w int) string {
 	crumbs = append(crumbs, m.current.Name)
 	bcStr := lipgloss.NewStyle().
 		Foreground(ui.ColorMuted).
-		Render("  " + strings.Join(crumbs, " "+ui.IconArrow+" "))
+		Render("  " + strings.Join(crumbs, " "+ui.IconChevron+" "))
 
 	inner := lipgloss.JoinVertical(lipgloss.Left, title, pathLine, bcStr)
 
 	return lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
-		BorderForeground(ui.ColorSecondary).
+		BorderForeground(ui.ColorBorderFocus).
 		Width(w - 2).
 		Render(inner)
 }
@@ -117,25 +115,10 @@ func (m AnalyzeModel) renderEntry(num int, entry *DirEntry, parentSize int64, ba
 	pct := entry.Percentage(parentSize)
 
 	// ── Size bar ─────────────────────────────────────────────
-	filled := int(pct / 100 * float64(barWidth))
-	if filled > barWidth {
-		filled = barWidth
-	}
-	if filled == 0 && entry.Size > 0 {
-		filled = 1 // always show something for non-empty entries
-	}
-
-	barColor := clrBar
-	if entry.Size >= 10*(1<<30) {
-		barColor = clrBarCrit
-	} else if entry.Size >= 1<<30 {
-		barColor = clrBarHot
-	}
-	bar := lipgloss.NewStyle().Foreground(barColor).Render(strings.Repeat("█", filled)) +
-		lipgloss.NewStyle().Foreground(clrDim).Render(strings.Repeat("░", barWidth-filled))
+	bar := ui.GradientBar(pct, barWidth)
 
 	// ── Icon ─────────────────────────────────────────────────
-	icon := "  "
+	icon := ui.IconBullet + " "
 	if entry.IsDir {
 		icon = ui.IconFolder
 	}
@@ -169,7 +152,7 @@ func (m AnalyzeModel) renderEntry(num int, entry *DirEntry, parentSize int64, ba
 
 	age := "     "
 	if entry.IsOld() {
-		age = lipgloss.NewStyle().Foreground(clrOld).Render(">6mo ")
+		age = ui.TagWarningStyle().Render(" >6mo ")
 	}
 
 	// ── Assemble ─────────────────────────────────────────────
@@ -177,7 +160,7 @@ func (m AnalyzeModel) renderEntry(num int, entry *DirEntry, parentSize int64, ba
 		numStr, bar, pctStr, icon, nameStr, sizeStr, age)
 
 	if selected {
-		cursor := lipgloss.NewStyle().Foreground(clrCursor).Bold(true).Render(ui.IconArrow)
+		cursor := lipgloss.NewStyle().Foreground(clrCursor).Bold(true).Render(ui.IconBlock)
 		line = " " + cursor + line[2:]
 		if m.confirmDelete {
 			line += lipgloss.NewStyle().
@@ -206,27 +189,21 @@ func (m AnalyzeModel) renderFooter(w int) string {
 	// Filter indicator.
 	if m.largeOnly {
 		parts = append(parts,
-			lipgloss.NewStyle().
-				Foreground(ui.ColorWarning).
-				Render("  filter: >100 MiB only"))
+			"  "+ui.TagWarningStyle().Render(" >100 MiB filter "))
 	}
 
 	// Keybindings.
 	hints := []string{
-		"↑↓ navigate",
-		"→ drill in",
-		"← go up",
+		"↑↓ nav",
+		"→ drill",
+		"← back",
 		"Enter open",
 		"⌫ delete",
 		"L large",
 		"q quit",
 	}
-	hintStr := strings.Join(hints, "  "+ui.IconPipe+"  ")
-	parts = append(parts,
-		lipgloss.NewStyle().
-			Foreground(ui.ColorMuted).
-			Italic(true).
-			Render("  "+hintStr))
+	hintStr := strings.Join(hints, " "+ui.IconPipe+" ")
+	parts = append(parts, ui.HintBarStyle().Render("  "+hintStr))
 
 	return strings.Join(parts, "\n")
 }

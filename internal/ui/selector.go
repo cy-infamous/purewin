@@ -18,6 +18,9 @@ type SelectorItem struct {
 	// Description is optional secondary text.
 	Description string
 
+	// Value is an opaque machine-use field for reverse-lookup.
+	Value string
+
 	// Size is a human-readable size string shown on the right.
 	Size string
 
@@ -262,25 +265,26 @@ func (m SelectorModel) View() string {
 
 	// ── Title ──
 	if m.title != "" {
-		titleStyle := lipgloss.NewStyle().
-			Foreground(ColorSecondary).
-			Bold(true)
-		b.WriteString(titleStyle.Render(m.title))
+		b.WriteString(HeaderStyle().Render(m.title))
+		b.WriteString(Divider(50))
 		b.WriteString("\n\n")
 	}
 
-	// ── Selection summary ──
+	// ── Selection summary (tag-style) ──
 	selCount := m.selectedCount()
 	totalCount := len(m.items)
-	summaryText := fmt.Sprintf("%d/%d selected", selCount, totalCount)
+	countTag := TagStyle().Render(fmt.Sprintf(" %d/%d ", selCount, totalCount))
 
 	totalBytes := m.totalSelectedBytes()
+	var summaryLine string
 	if totalBytes > 0 {
-		summaryText += " │ " + FormatSize(totalBytes)
+		sizeTag := TagAccentStyle().Render(" " + FormatSizePlain(totalBytes) + " ")
+		summaryLine = countTag + "  " + sizeTag
+	} else {
+		summaryLine = countTag
 	}
 
-	summaryStyle := lipgloss.NewStyle().Foreground(ColorTextDim)
-	b.WriteString(summaryStyle.Render("  " + summaryText))
+	b.WriteString("  " + summaryLine)
 	b.WriteString("\n\n")
 
 	// ── Items ──
@@ -295,20 +299,19 @@ func (m SelectorModel) View() string {
 		// Category header (only when category changes).
 		if item.Category != "" && item.Category != lastCategory {
 			lastCategory = item.Category
-			catHeader := CategoryHeaderStyle().Render("── " + item.Category + " ──")
-			b.WriteString(catHeader)
+			b.WriteString(SectionHeader(item.Category, 50))
 			b.WriteByte('\n')
 		}
 
 		// Build the line.
 		var line strings.Builder
 
-		// Cursor indicator.
+		// Cursor indicator (crush-style thick bar focus).
 		if isActive {
 			line.WriteString(lipgloss.NewStyle().
 				Foreground(ColorPrimary).
 				Bold(true).
-				Render(IconArrow + " "))
+				Render(IconBlock + " "))
 		} else {
 			line.WriteString("  ")
 		}
@@ -320,9 +323,9 @@ func (m SelectorModel) View() string {
 			line.WriteString(lipgloss.NewStyle().
 				Foreground(ColorPrimary).
 				Bold(true).
-				Render(IconSelected + " "))
+				Render(IconRadioOn + " "))
 		} else {
-			line.WriteString(MutedStyle().Render(IconUnselected + " "))
+			line.WriteString(MutedStyle().Render(IconRadioOff + " "))
 		}
 
 		// Label.
@@ -335,7 +338,7 @@ func (m SelectorModel) View() string {
 				Render(item.Label))
 		} else if item.Selected {
 			line.WriteString(lipgloss.NewStyle().
-				Foreground(ColorText).
+				Foreground(ColorPrimary).
 				Render(item.Label))
 		} else {
 			line.WriteString(lipgloss.NewStyle().
@@ -358,8 +361,8 @@ func (m SelectorModel) View() string {
 
 		// Description for active item.
 		if isActive && item.Description != "" {
-			desc := MenuDescriptionStyle().Render(item.Description)
-			b.WriteString("    " + desc)
+			desc := MutedStyle().Italic(true).Render(item.Description)
+			b.WriteString("      " + desc)
 			b.WriteByte('\n')
 		}
 	}
@@ -376,17 +379,17 @@ func (m SelectorModel) View() string {
 	// ── Hint Bar ──
 	b.WriteByte('\n')
 	var hints []string
-	hints = append(hints, "↑↓ Navigate")
-	hints = append(hints, "Space Toggle")
-	hints = append(hints, "A All")
-	hints = append(hints, "N None")
+	hints = append(hints, "↑↓ nav")
+	hints = append(hints, "space toggle")
+	hints = append(hints, "a all")
+	hints = append(hints, "n none")
 	if totalPages > 1 {
-		hints = append(hints, "PgUp/PgDn Pages")
+		hints = append(hints, "pgup/pgdn pages")
 	}
-	hints = append(hints, "Enter Confirm")
-	hints = append(hints, "Q Quit")
+	hints = append(hints, "enter ok")
+	hints = append(hints, "q quit")
 
-	hintText := "  " + strings.Join(hints, " │ ")
+	hintText := "  " + strings.Join(hints, " "+IconPipe+" ")
 	b.WriteString(HintBarStyle().Render(hintText))
 	b.WriteByte('\n')
 

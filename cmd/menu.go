@@ -24,14 +24,14 @@ type mainMenuItem struct {
 // mainMenuItems defines the exact order and content of the interactive menu.
 var mainMenuItems = []mainMenuItem{
 	{icon: ui.IconTrash, label: "Clean", description: "Deep clean system caches and temp files", command: "clean"},
-	{icon: ui.IconTrash, label: "Uninstall", description: "Remove installed applications", command: "uninstall"},
+	{icon: ui.IconFolder, label: "Uninstall", description: "Remove installed applications", command: "uninstall"},
 	{icon: ui.IconArrow, label: "Optimize", description: "Speed up Windows with service tuning", command: "optimize"},
-	{icon: ui.IconFolder, label: "Analyze", description: "Explore disk space usage", command: "analyze"},
-	{icon: ui.IconBullet, label: "Status", description: "Live system health monitor", command: "status"},
-	{icon: ui.IconFolder, label: "Purge", description: "Clean project build artifacts", command: "purge"},
-	{icon: ui.IconCorner, label: "Installers", description: "Find and remove old installers", command: "installer"},
-	{icon: ui.IconSelected, label: "Update", description: "Check for WinMole updates", command: "update"},
-	{icon: ui.IconError, label: "Remove", description: "Uninstall WinMole from this system", command: "remove"},
+	{icon: ui.IconDiamond, label: "Analyze", description: "Explore disk space usage", command: "analyze"},
+	{icon: ui.IconDot, label: "Status", description: "Live system health monitor", command: "status"},
+	{icon: ui.IconTrash, label: "Purge", description: "Clean project build artifacts", command: "purge"},
+	{icon: ui.IconFolder, label: "Installers", description: "Find and remove old installers", command: "installer"},
+	{icon: ui.IconPending, label: "Update", description: "Check for WinMole updates", command: "update"},
+	{icon: ui.IconCross, label: "Remove", description: "Uninstall WinMole from this system", command: "remove"},
 }
 
 // ─── Main Menu Model ─────────────────────────────────────────────────────────
@@ -130,10 +130,7 @@ func (m mainMenuModel) View() string {
 	b.WriteByte('\n')
 
 	// ── Title ──
-	titleStyle := lipgloss.NewStyle().
-		Foreground(ui.ColorSecondary).
-		Bold(true)
-	b.WriteString(titleStyle.Render("  Choose an action:"))
+	b.WriteString(ui.SectionHeader("Choose an action", 50))
 	b.WriteString("\n\n")
 
 	// ── Menu Items ──
@@ -142,48 +139,26 @@ func (m mainMenuModel) View() string {
 		number := fmt.Sprintf("%d", i+1)
 
 		if isActive {
-			// Active row: arrow + number + icon + bold title + description.
-			arrow := lipgloss.NewStyle().
-				Foreground(ui.ColorPrimary).
-				Bold(true).
-				Render(ui.IconArrow)
-
-			num := lipgloss.NewStyle().
-				Foreground(ui.ColorPrimary).
-				Bold(true).
-				Render(number)
-
-			label := lipgloss.NewStyle().
-				Foreground(ui.ColorPrimary).
-				Bold(true).
-				Render(item.label)
-
-			desc := lipgloss.NewStyle().
-				Foreground(ui.ColorTextDim).
-				Render(item.description)
-
-			b.WriteString(fmt.Sprintf("  %s %s. %s  %s\n",
-				arrow, num, label, desc))
+			// Active: ▌ 1. ◆ Clean  Deep clean system caches...
+			cursor := lipgloss.NewStyle().Foreground(ui.ColorPrimary).Bold(true).Render(ui.IconBlock)
+			num := lipgloss.NewStyle().Foreground(ui.ColorPrimary).Bold(true).Render(number)
+			icon := lipgloss.NewStyle().Foreground(ui.ColorPrimary).Render(item.icon)
+			label := lipgloss.NewStyle().Foreground(ui.ColorPrimary).Bold(true).Render(item.label)
+			desc := lipgloss.NewStyle().Foreground(ui.ColorTextDim).Render(item.description)
+			b.WriteString(fmt.Sprintf(" %s %s. %s %s  %s\n", cursor, num, icon, label, desc))
 		} else {
-			// Inactive row: number + icon + title in muted tone.
+			// Inactive:   1. ◆ Clean  Deep clean system caches...
 			num := ui.MutedStyle().Render(number)
-			label := lipgloss.NewStyle().
-				Foreground(ui.ColorText).
-				Render(item.label)
-
-			b.WriteString(fmt.Sprintf("    %s. %s\n", num, label))
+			icon := ui.MutedStyle().Render(item.icon)
+			label := lipgloss.NewStyle().Foreground(ui.ColorText).Render(item.label)
+			desc := lipgloss.NewStyle().Foreground(ui.ColorMuted).Render(item.description)
+			b.WriteString(fmt.Sprintf("   %s. %s %s  %s\n", num, icon, label, desc))
 		}
 	}
 
 	// ── Hint Bar ──
 	b.WriteByte('\n')
-	hints := ui.HintBarStyle().Render(
-		"  " + ui.IconPipe + " " + lipgloss.JoinHorizontal(lipgloss.Top,
-			"  up/down/j/k navigate",
-			"  "+ui.IconPipe+" Enter select",
-			"  "+ui.IconPipe+" 1-9 quick select",
-			"  "+ui.IconPipe+" q quit",
-		))
+	hints := ui.HintBarStyle().Render("↑↓ nav │ enter select │ 1-9 quick │ q quit")
 	b.WriteString(hints)
 	b.WriteByte('\n')
 
@@ -193,18 +168,12 @@ func (m mainMenuModel) View() string {
 
 	if m.isAdmin {
 		adminStyle := lipgloss.NewStyle().Foreground(ui.ColorWarning)
-		footerParts = append(footerParts, adminStyle.Render("  Admin"))
-	} else {
-		nonAdminStyle := lipgloss.NewStyle().Foreground(ui.ColorMuted)
-		footerParts = append(footerParts, nonAdminStyle.Render("  Non-admin"))
+		footerParts = append(footerParts, adminStyle.Render(ui.IconDot+" admin"))
 	}
 
-	versionStyle := lipgloss.NewStyle().Foreground(ui.ColorMuted)
-	footerParts = append(footerParts,
-		versionStyle.Render(fmt.Sprintf("v%s", appVersion)))
+	footerParts = append(footerParts, ui.MutedStyle().Render(fmt.Sprintf("v%s", appVersion)))
 
-	b.WriteString(ui.MutedStyle().Render(
-		strings.Join(footerParts, "  "+ui.IconPipe+"  ")))
+	b.WriteString(strings.Join(footerParts, " "+ui.IconPipe+" "))
 	b.WriteByte('\n')
 
 	return b.String()

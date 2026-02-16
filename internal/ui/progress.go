@@ -330,10 +330,7 @@ func (s *InlineSpinner) Stop(finalMessage string) {
 	<-s.done
 
 	// Clear the spinner line and write the final message.
-	check := lipgloss.NewStyle().
-		Foreground(ColorPrimary).
-		Bold(true).
-		Render(IconSuccess)
+	check := SuccessStyle().Bold(true).Render(IconCheck)
 
 	fmt.Printf("\r  %s %s    \n", check, finalMessage)
 }
@@ -343,10 +340,7 @@ func (s *InlineSpinner) StopWithError(errMessage string) {
 	s.stopOnce.Do(func() { close(s.stop) })
 	<-s.done
 
-	cross := lipgloss.NewStyle().
-		Foreground(ColorError).
-		Bold(true).
-		Render(IconError)
+	cross := ErrorStyle().Bold(true).Render(IconCross)
 
 	fmt.Printf("\r  %s %s    \n", cross, errMessage)
 }

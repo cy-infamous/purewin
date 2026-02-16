@@ -13,23 +13,13 @@ import (
 // Extends the global palette with shell-specific accent styles.
 // Designed to be competitive with charmbracelet/crush aesthetics.
 
+// Shell-specific accent colors — intentionally distinct from ui.Color* for the shell's unique visual identity.
 var (
 	// Accent: dusty mauve — primary interactive elements.
 	accent = lipgloss.AdaptiveColor{Light: "#8c6f7e", Dark: "#b89aab"}
 
-	// Accent alt: deep periwinkle — secondary highlights (darkened for ≈4.5:1 contrast with cream).
-	accentAlt = lipgloss.AdaptiveColor{Light: "#7a7899", Dark: "#6b6990"}
-
 	// Dim: warm gray — chrome, borders, secondary text.
 	dim = lipgloss.AdaptiveColor{Light: "#8a7e76", Dark: "#6b6360"}
-
-	// Subtle: lighter warm gray — very faint elements.
-	subtle = lipgloss.AdaptiveColor{Light: "#c4b8ac", Dark: "#4a4340"}
-
-	// Cream: foreground text on dark backgrounds.
-	cream = lipgloss.AdaptiveColor{Light: "#3b2618", Dark: "#f2e8dc"}
-
-	// Surface reserved: {Light: "#f5ede4", Dark: "#2c2118"}
 
 	// ── Prompt ──
 	promptSymbol = lipgloss.NewStyle().Foreground(accent).Bold(true)
@@ -43,10 +33,10 @@ var (
 	bannerHint = lipgloss.NewStyle().Foreground(dim).Italic(true)
 
 	// ── Completions Popup ──
-	compBorder       = lipgloss.NewStyle().Foreground(subtle)
-	compActiveRow    = lipgloss.NewStyle().Background(accentAlt).Foreground(cream).Bold(true) // wraps full padded row
-	compActiveName   = lipgloss.NewStyle().Background(accentAlt).Foreground(cream).Bold(true)
-	compActiveDesc   = lipgloss.NewStyle().Background(accentAlt).Foreground(cream).Italic(true)
+	compBorder       = lipgloss.NewStyle().Foreground(ui.ColorBorder)
+	compActiveRow    = lipgloss.NewStyle().Background(ui.ColorOverlay).Foreground(ui.ColorText).Bold(true) // wraps full padded row
+	compActiveName   = lipgloss.NewStyle().Background(ui.ColorOverlay).Foreground(ui.ColorText).Bold(true)
+	compActiveDesc   = lipgloss.NewStyle().Background(ui.ColorOverlay).Foreground(ui.ColorTextDim).Italic(true)
 	compInactiveName = lipgloss.NewStyle().Foreground(ui.ColorText)
 	compInactiveDesc = lipgloss.NewStyle().Foreground(dim).Italic(true)
 	compAdminBadge   = lipgloss.NewStyle().Foreground(ui.ColorWarning)
@@ -55,29 +45,29 @@ var (
 	outputText    = lipgloss.NewStyle().Foreground(ui.ColorText)
 	outputEcho    = lipgloss.NewStyle().Foreground(accent).Bold(true)
 	outputDimEcho = lipgloss.NewStyle().Foreground(dim)
-	outputCmd     = lipgloss.NewStyle().Foreground(cream).Bold(true)
+	outputCmd     = lipgloss.NewStyle().Foreground(ui.ColorText).Bold(true)
 
 	// ── Scroll & Status ──
 	scrollHint  = lipgloss.NewStyle().Foreground(dim).Italic(true)
 	statusText  = lipgloss.NewStyle().Foreground(dim).Italic(true)
 	statusKey   = lipgloss.NewStyle().Foreground(ui.ColorMuted)
-	statusSep   = lipgloss.NewStyle().Foreground(subtle)
+	statusSep   = lipgloss.NewStyle().Foreground(ui.ColorBorder)
 	statusAdmin = lipgloss.NewStyle().Foreground(ui.ColorWarning).Bold(true)
 )
 
-// cmdIcons maps command names to their emoji icons for the completions popup.
+// cmdIcons maps command names to their crush-style Unicode glyphs for the completions popup.
 var cmdIcons = map[string]string{
-	"clean":     "🧹",
-	"uninstall": "📦",
-	"optimize":  "⚡",
-	"analyze":   "📊",
-	"status":    "💓",
-	"purge":     "🗑",
-	"installer": "📥",
-	"update":    "🔄",
-	"version":   "🏷",
-	"help":      "❓",
-	"quit":      "👋",
+	"clean":     ui.IconTrash,
+	"uninstall": ui.IconFolder,
+	"optimize":  ui.IconArrow,
+	"analyze":   ui.IconDiamond,
+	"status":    ui.IconDot,
+	"purge":     ui.IconTrash,
+	"installer": ui.IconFolder,
+	"update":    ui.IconReload,
+	"version":   ui.IconDiamond,
+	"help":      ui.IconHelp,
+	"quit":      ui.IconCross,
 }
 
 // View renders the complete shell interface.
@@ -107,7 +97,7 @@ func (m ShellModel) View() string {
 	}
 
 	// ── Input Separator ──
-	sepLine := strings.Repeat("╌", w-4)
+	sepLine := strings.Repeat(ui.IconDashLight, w-4)
 	s.WriteString("  " + compBorder.Render(sepLine) + "\n")
 
 	// ── Prompt Line ──
@@ -126,13 +116,11 @@ func (m ShellModel) renderBanner(w int) string {
 
 	s.WriteString("\n")
 
-	// 5-line mole ASCII art in accent color.
+	// Refined 3-line mole ASCII art in accent color.
 	art := []string{
-		`    ╱▔▔▔╲    `,
-		`   ╱  ◉ ◉ ╲  `,
-		`  ▕   ▽   ▏  `,
-		`   ╲ ═══ ╱   `,
-		`    ╲▁▁▁╱    `,
+		`  ◆ ─── ◆`,
+		`  │ ◉ ◉ │`,
+		`  ╰─▽──╯`,
 	}
 	for _, line := range art {
 		s.WriteString("  " + bannerArt.Render(line) + "\n")
@@ -146,9 +134,8 @@ func (m ShellModel) renderBanner(w int) string {
 	s.WriteString("  " + bannerHint.Render("Type / for commands · /help for details") + "\n")
 	s.WriteString("\n")
 
-	// Thin separator.
-	sep := strings.Repeat("─", w-4)
-	s.WriteString("  " + compBorder.Render(sep) + "\n")
+	// Thin separator using SectionHeader style.
+	s.WriteString("  " + ui.SectionHeader("", w-4) + "\n")
 	s.WriteString("\n")
 
 	return s.String()
@@ -202,10 +189,10 @@ func (m ShellModel) renderOutput(w int) string {
 		}
 
 		// Style echo lines (lines starting with "wm ❯") differently.
-		if strings.HasPrefix(line, "wm ❯ ") {
-			cmd := strings.TrimPrefix(line, "wm ❯ ")
+		if strings.HasPrefix(line, "wm "+ui.IconPrompt+" ") {
+			cmd := strings.TrimPrefix(line, "wm "+ui.IconPrompt+" ")
 			echoLine := outputDimEcho.Render("wm") + " " +
-				outputEcho.Render("❯") + " " +
+				outputEcho.Render(ui.IconPrompt) + " " +
 				outputCmd.Render(cmd)
 			s.WriteString(echoLine + "\n")
 		} else if line == "" {
@@ -284,13 +271,13 @@ func (m ShellModel) renderCompletions(w int) string {
 		// Icon.
 		icon := cmdIcons[cmd.Name]
 		if icon == "" {
-			icon = " ·" // 2-cell placeholder matching emoji width
+			icon = " " + ui.IconBullet
 		}
 
 		// Admin badge.
 		adminMark := ""
 		if cmd.AdminHint {
-			adminMark = " ⚑"
+			adminMark = " " + ui.IconDot
 		}
 
 		// Name and description.
@@ -314,7 +301,7 @@ func (m ShellModel) renderCompletions(w int) string {
 		var contentLine string
 		adminStr := ""
 		if adminMark != "" {
-			adminStr = " " + compAdminBadge.Render("⚑")
+			adminStr = " " + compAdminBadge.Render(ui.IconDot)
 		}
 
 		if i == cursor {
@@ -354,7 +341,7 @@ func (m ShellModel) renderCompletions(w int) string {
 
 func (m ShellModel) renderPrompt(_ int) string {
 	label := promptLabel.Render("wm")
-	symbol := promptSymbol.Render(" ❯ ")
+	symbol := promptSymbol.Render(" " + ui.IconPrompt + " ")
 	input := m.textInput.View()
 	return label + symbol + input + "\n"
 }
@@ -362,13 +349,13 @@ func (m ShellModel) renderPrompt(_ int) string {
 // ─── Status Bar ──────────────────────────────────────────────────────────────
 
 func (m ShellModel) renderStatusBar(_ int) string {
-	sep := statusSep.Render(" │ ")
+	sep := statusSep.Render(" " + ui.IconPipe + " ")
 
 	var parts []string
 
-	// Admin badge.
+	// Admin badge with IconDot.
 	if m.IsAdmin {
-		parts = append(parts, statusAdmin.Render("⚑ admin"))
+		parts = append(parts, statusAdmin.Render(ui.IconDot+" admin"))
 	}
 
 	// Key hints.

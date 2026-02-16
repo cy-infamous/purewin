@@ -45,7 +45,7 @@ func runInstaller(cmd *cobra.Command, args []string) {
 
 	// Start scanning
 	fmt.Println()
-	fmt.Println(ui.HeaderStyle().Render("💾 Installer File Cleanup"))
+	fmt.Println(ui.SectionHeader("Installer Cleanup", 50))
 	fmt.Println()
 
 	spinner := ui.NewInlineSpinner()
@@ -62,7 +62,7 @@ func runInstaller(cmd *cobra.Command, args []string) {
 
 	if len(files) == 0 {
 		fmt.Println()
-		fmt.Println(ui.SuccessStyle().Render("  ✓ No installer files found!"))
+		fmt.Println(ui.SuccessStyle().Render(fmt.Sprintf("  %s No installer files found!", ui.IconCheck)))
 		fmt.Println()
 		return
 	}
@@ -89,7 +89,7 @@ func runInstaller(cmd *cobra.Command, args []string) {
 	for _, item := range selected {
 		// Find the file by path
 		for _, file := range files {
-			if file.Path == item.Description {
+			if file.Path == item.Value {
 				selectedFiles = append(selectedFiles, file)
 				break
 			}
@@ -168,6 +168,7 @@ func installerFilesToSelectorItems(files []installer.InstallerFile) []ui.Selecto
 			item := ui.SelectorItem{
 				Label:       file.Name,
 				Description: fmt.Sprintf("%s • %s old", file.Path, ageStr),
+				Value:       file.Path,
 				Size:        core.FormatSize(file.Size),
 				Selected:    true,
 				Disabled:    false,

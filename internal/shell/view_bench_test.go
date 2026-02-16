@@ -34,7 +34,7 @@ func BenchmarkShellViewWithCompletions(b *testing.B) {
 }
 
 func BenchmarkPadToWidth(b *testing.B) {
-	s := "  🧹 /clean       Deep clean system caches"
+	s := "  ✕ /clean       Deep clean system caches"
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_ = padToWidth(s, 52)

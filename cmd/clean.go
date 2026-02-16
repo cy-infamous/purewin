@@ -77,8 +77,7 @@ func runClean(cmd *cobra.Command, args []string) {
 
 	// ── Header ───────────────────────────────────────────────────────────
 	fmt.Println()
-	fmt.Println(ui.HeaderStyle().Render(
-		fmt.Sprintf("  %s  WinMole Deep Clean", ui.IconTrash)))
+	fmt.Println(ui.SectionHeader("Deep Clean", 55))
 
 	if dryRun {
 		fmt.Println(ui.WarningStyle().Render(
@@ -403,8 +402,7 @@ func displayCleanResults(
 		}
 
 		// Category header.
-		fmt.Println(ui.CategoryHeaderStyle().Render(
-			fmt.Sprintf("  %s  %s", ui.IconFolder, cat.label)))
+		fmt.Println(ui.SectionHeader(cat.label, 55))
 
 		// Sort results within category for stable output.
 		if hasGroup {

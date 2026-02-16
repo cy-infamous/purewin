@@ -32,7 +32,7 @@ func runUpdate(cmd *cobra.Command, args []string) {
 	}
 
 	fmt.Println()
-	fmt.Println(ui.HeaderStyle().Render("🔄 WinMole Update"))
+	fmt.Println(ui.SectionHeader("Update", 50))
 	fmt.Println()
 
 	// Show current version
