@@ -52,6 +52,8 @@ func FlushDNS() error {
 }
 
 // RestartService stops and then starts a Windows service by name.
+// Services that auto-restart (DNS Client, DHCP Client, etc.) are handled
+// gracefully — "already started" after a stop attempt is treated as success.
 func RestartService(name string) error {
 	if err := core.RequireAdmin("restart service"); err != nil {
 		return err
@@ -64,6 +66,9 @@ func RestartService(name string) error {
 	stopCmd := exec.CommandContext(stopCtx, "net", "stop", name)
 	_, _ = stopCmd.CombinedOutput()
 
+	// Brief pause to let the service fully stop before restarting.
+	time.Sleep(1 * time.Second)
+
 	// Start the service.
 	startCtx, startCancel := context.WithTimeout(context.Background(), serviceTimeout)
 	defer startCancel()
@@ -71,8 +76,15 @@ func RestartService(name string) error {
 	startCmd := exec.CommandContext(startCtx, "net", "start", name)
 	output, err := startCmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("failed to start service %s: %s: %w",
-			name, strings.TrimSpace(string(output)), err)
+		outStr := strings.TrimSpace(string(output))
+
+		// "The requested service has already been started" means the service
+		// auto-restarted after the stop — this is the desired outcome.
+		if strings.Contains(strings.ToLower(outStr), "already been started") {
+			return nil
+		}
+
+		return fmt.Errorf("failed to start service %s: %s: %w", name, outStr, err)
 	}
 	return nil
 }
