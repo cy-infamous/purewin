@@ -28,9 +28,6 @@ var mascotLines = []string{
 // groundLine is the terrain beneath the mascot.
 var groundLine = `    ─────────────────  `
 
-// moleLines is kept as an alias for backward compatibility.
-var moleLines = mascotLines
-
 // brandBanner is the large ASCII wordmark.
 var brandLines = []string{
 	"  ____                  __        ___       ",

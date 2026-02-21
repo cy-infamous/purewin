@@ -1,6 +1,7 @@
 package purge
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -222,22 +223,23 @@ func hasAnyIndicator(dir string, indicators []string) bool {
 }
 
 // PurgeArtifacts deletes the specified artifacts and returns total bytes freed and count.
+// All errors are accumulated and returned as a joined error.
 func PurgeArtifacts(artifacts []ProjectArtifact, dryRun bool) (int64, int, error) {
 	var totalBytes int64
 	var totalCount int
-	var lastErr error
+	var errs []error
 
 	for _, artifact := range artifacts {
 		freed, err := core.SafeDelete(artifact.ArtifactPath, dryRun)
 		if err != nil {
-			lastErr = err
+			errs = append(errs, err)
 			continue
 		}
 		totalBytes += freed
 		totalCount++
 	}
 
-	return totalBytes, totalCount, lastErr
+	return totalBytes, totalCount, errors.Join(errs...)
 }
 
 // GetDefaultScanPaths returns the default paths to scan for projects.

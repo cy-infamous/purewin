@@ -354,7 +354,7 @@ func runClean(cmd *cobra.Command, args []string) {
 
 	if errCount > 0 {
 		fmt.Println(ui.WarningStyle().Render(
-			fmt.Sprintf("  %s  %d items skipped (locked or access denied)",
+			fmt.Sprintf("  %s  %d items skipped (locked, access denied, or safety check)",
 				ui.IconWarning, errCount)))
 	}
 	fmt.Println()

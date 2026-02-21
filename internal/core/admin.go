@@ -29,6 +29,50 @@ func RequireAdmin(operation string) error {
 	)
 }
 
+// escapeWindowsArg escapes a single command-line argument for Windows
+// using the CommandLineToArgvW convention. Arguments containing spaces,
+// tabs, or quotes are wrapped in double quotes with proper backslash
+// escaping to prevent argument injection during elevation.
+func escapeWindowsArg(arg string) string {
+	if arg == "" {
+		return `""`
+	}
+	// If no special characters, return as-is.
+	if !strings.ContainsAny(arg, " \t\"\\") {
+		return arg
+	}
+
+	var b strings.Builder
+	b.WriteByte('"')
+	nBackslash := 0
+	for _, c := range arg {
+		switch c {
+		case '\\':
+			nBackslash++
+		case '"':
+			// Double existing backslashes + escape the quote.
+			for i := 0; i < nBackslash*2+1; i++ {
+				b.WriteByte('\\')
+			}
+			b.WriteByte('"')
+			nBackslash = 0
+		default:
+			// Flush accumulated backslashes.
+			for i := 0; i < nBackslash; i++ {
+				b.WriteByte('\\')
+			}
+			b.WriteRune(c)
+			nBackslash = 0
+		}
+	}
+	// Trailing backslashes must be doubled before the closing quote.
+	for i := 0; i < nBackslash*2; i++ {
+		b.WriteByte('\\')
+	}
+	b.WriteByte('"')
+	return b.String()
+}
+
 // RunElevated re-launches the current process with administrator privileges
 // via the Windows ShellExecuteW "runas" verb. This triggers a UAC prompt.
 // The current process exits after launching the elevated one.
@@ -46,7 +90,12 @@ func RunElevated(args []string) error {
 		return fmt.Errorf("invalid executable path: %w", err)
 	}
 
-	argStr := strings.Join(args, " ")
+	// Properly escape each argument to prevent injection via spaces/quotes.
+	escaped := make([]string, len(args))
+	for i, arg := range args {
+		escaped[i] = escapeWindowsArg(arg)
+	}
+	argStr := strings.Join(escaped, " ")
 	argsUTF16, err := windows.UTF16PtrFromString(argStr)
 	if err != nil {
 		return fmt.Errorf("invalid arguments: %w", err)

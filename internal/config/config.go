@@ -124,12 +124,14 @@ func Load() (*Config, error) {
 
 // Save persists the current configuration to disk.
 func (c *Config) Save() error {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	return c.save(configPath(c.ConfigDir))
 }
 
 // save writes the config to the given path, creating directories as needed.
+// Uses atomic write (temp file + rename) to prevent corruption from
+// interrupted writes or concurrent access.
 func (c *Config) save(path string) error {
 	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -141,8 +143,26 @@ func (c *Config) save(path string) error {
 		return fmt.Errorf("failed to marshal config: %w", err)
 	}
 
-	if err := os.WriteFile(path, data, 0o644); err != nil {
-		return fmt.Errorf("failed to write config to %s: %w", path, err)
+	// Atomic write: write to temp file then rename.
+	tmp, err := os.CreateTemp(dir, ".config-*.tmp")
+	if err != nil {
+		return fmt.Errorf("failed to create temp config file: %w", err)
+	}
+	tmpPath := tmp.Name()
+
+	if _, writeErr := tmp.Write(data); writeErr != nil {
+		tmp.Close()
+		os.Remove(tmpPath)
+		return fmt.Errorf("failed to write temp config: %w", writeErr)
+	}
+	if closeErr := tmp.Close(); closeErr != nil {
+		os.Remove(tmpPath)
+		return fmt.Errorf("failed to close temp config: %w", closeErr)
+	}
+
+	if renameErr := os.Rename(tmpPath, path); renameErr != nil {
+		os.Remove(tmpPath)
+		return fmt.Errorf("failed to rename config file: %w", renameErr)
 	}
 
 	return nil

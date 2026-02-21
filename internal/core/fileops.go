@@ -76,6 +76,27 @@ func SafeDelete(path string, dryRun bool) (int64, error) {
 		return size, nil
 	}
 
+	// TOCTOU mitigation: re-check for symlinks immediately before deletion.
+	// Between ValidatePath (above) and here, the target could have been
+	// replaced with a symlink pointing to a protected location.
+	reInfo, reErr := os.Lstat(path)
+	if reErr != nil {
+		if os.IsNotExist(reErr) {
+			return 0, nil // Disappeared — nothing to delete.
+		}
+		return 0, fmt.Errorf("pre-delete re-stat failed for %s: %w", path, reErr)
+	}
+	if reInfo.Mode()&os.ModeSymlink != 0 {
+		resolved, resolveErr := filepath.EvalSymlinks(path)
+		if resolveErr != nil {
+			return 0, fmt.Errorf("cannot resolve symlink %s before delete: %w", path, resolveErr)
+		}
+		if !IsSafePath(resolved) {
+			return 0, fmt.Errorf("path %s is now a symlink to protected location %s", path, resolved)
+		}
+	}
+	info = reInfo // Use the latest stat result for deletion decisions.
+
 	// Attempt deletion with retry.
 	var lastErr error
 	for attempt := 0; attempt < maxRetries; attempt++ {

@@ -65,6 +65,8 @@ func Load(path string) (*Whitelist, error) {
 }
 
 // Save persists the current whitelist patterns to disk.
+// Uses atomic write (temp file + rename) to prevent corruption from
+// interrupted writes or concurrent access.
 func (w *Whitelist) Save() error {
 	w.mu.RLock()
 	defer w.mu.RUnlock()
@@ -82,9 +84,29 @@ func (w *Whitelist) Save() error {
 		sb.WriteString(p + "\n")
 	}
 
-	if err := os.WriteFile(w.path, []byte(sb.String()), 0o644); err != nil {
-		return fmt.Errorf("cannot write whitelist file %s: %w", w.path, err)
+	// Atomic write: write to temp file then rename.
+	data := []byte(sb.String())
+	tmp, err := os.CreateTemp(dir, ".whitelist-*.tmp")
+	if err != nil {
+		return fmt.Errorf("cannot create temp whitelist file: %w", err)
 	}
+	tmpPath := tmp.Name()
+
+	if _, writeErr := tmp.Write(data); writeErr != nil {
+		tmp.Close()
+		os.Remove(tmpPath)
+		return fmt.Errorf("cannot write temp whitelist file: %w", writeErr)
+	}
+	if closeErr := tmp.Close(); closeErr != nil {
+		os.Remove(tmpPath)
+		return fmt.Errorf("cannot close temp whitelist file: %w", closeErr)
+	}
+
+	if renameErr := os.Rename(tmpPath, w.path); renameErr != nil {
+		os.Remove(tmpPath)
+		return fmt.Errorf("cannot rename whitelist file: %w", renameErr)
+	}
+
 	return nil
 }
 
@@ -171,11 +193,19 @@ func (w *Whitelist) Remove(pattern string) error {
 
 // IsWhitelisted returns true if the given path matches any whitelist
 // pattern. Environment variables in patterns are expanded before matching.
+// Paths are normalized via EvalSymlinks to resolve 8.3 short names
+// (e.g., PROGRA~1 -> Program Files) and prevent bypass via alternate names.
 func (w *Whitelist) IsWhitelisted(path string) bool {
 	w.mu.RLock()
 	defer w.mu.RUnlock()
 
 	cleaned := filepath.Clean(path)
+
+	// Resolve 8.3 short names, symlinks, and junctions to canonical form.
+	// This prevents bypass via alternate path representations.
+	if resolved, err := filepath.EvalSymlinks(cleaned); err == nil {
+		cleaned = resolved
+	}
 
 	for _, pattern := range w.patterns {
 		expanded := envutil.ExpandWindowsEnv(pattern)

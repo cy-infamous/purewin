@@ -1,6 +1,8 @@
 package update
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -9,6 +11,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -228,7 +231,8 @@ func ApplyUpdate(tempPath string) error {
 	return nil
 }
 
-// copyFile copies a file from src to dst.
+// copyFile copies a file from src to dst. The destination file is explicitly
+// closed (not deferred) so that write errors during Close are caught.
 func copyFile(src, dst string) error {
 	in, err := os.Open(src)
 	if err != nil {
@@ -240,10 +244,9 @@ func copyFile(src, dst string) error {
 	if err != nil {
 		return err
 	}
-	defer out.Close()
 
-	_, err = io.Copy(out, in)
-	if err != nil {
+	if _, err = io.Copy(out, in); err != nil {
+		out.Close()
 		return err
 	}
 
@@ -300,32 +303,208 @@ func SelfRemove(configDir, cacheDir string) error {
 	return scheduleBinaryDeletion(exePath)
 }
 
-// scheduleBinaryDeletion spawns a process that waits and then deletes the binary.
+// scheduleBinaryDeletion spawns a detached cmd.exe process that waits a few
+// seconds and then deletes the binary. The entire shell command is passed as
+// a single string to "cmd /C" so that redirection and chaining operators are
+// interpreted correctly.
 func scheduleBinaryDeletion(exePath string) error {
-	// Create a batch script to delete the executable after a delay
-	// cmd /c ping localhost -n 3 > nul && del "path"
-	cmd := exec.Command("cmd", "/c", "ping", "localhost", "-n", "3", ">", "nul", "&&", "del", "/f", "/q", exePath)
+	// Validate the path doesn't contain double-quotes which would break
+	// the cmd /C quoting and allow command injection.
+	if strings.ContainsRune(exePath, '"') {
+		return fmt.Errorf("executable path contains invalid character: %s", exePath)
+	}
+
+	script := fmt.Sprintf(`ping localhost -n 3 > nul & del /f /q "%s"`, exePath)
+	cmd := exec.Command("cmd", "/C", script)
 	cmd.Stdout = nil
 	cmd.Stderr = nil
 	cmd.Stdin = nil
 
-	// Start the process in detached mode
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("failed to schedule binary deletion: %w", err)
 	}
 
-	// Don't wait for the process to finish
 	return nil
 }
 
-// IsNewerVersion compares two version strings and returns true if newer > current.
-// Versions should be in semver format (e.g., "1.2.3" or "v1.2.3").
+// IsNewerVersion compares two semver version strings and returns true if
+// newer > current. Versions may optionally have a "v" prefix.
+// Handles unequal segment counts (e.g. "1.2" vs "1.2.1").
 func IsNewerVersion(current, newer string) bool {
-	// Remove 'v' prefix if present
 	current = strings.TrimPrefix(current, "v")
 	newer = strings.TrimPrefix(newer, "v")
 
-	// Simple string comparison works for most cases
-	// For production, consider using a proper semver library
-	return newer > current && newer != current
+	if current == newer {
+		return false
+	}
+
+	curParts := strings.Split(current, ".")
+	newParts := strings.Split(newer, ".")
+
+	// Compare up to the length of the longer version string.
+	maxLen := len(curParts)
+	if len(newParts) > maxLen {
+		maxLen = len(newParts)
+	}
+
+	for i := 0; i < maxLen; i++ {
+		var c, n int
+		if i < len(curParts) {
+			c = atoiSafe(curParts[i])
+		}
+		if i < len(newParts) {
+			n = atoiSafe(newParts[i])
+		}
+		if n > c {
+			return true
+		}
+		if n < c {
+			return false
+		}
+	}
+
+	return false
+}
+
+// DownloadAndVerifyUpdate downloads the update binary and verifies its
+// integrity. It checks the file size against the GitHub API metadata and,
+// if a checksums file exists in the release assets, verifies the SHA256 hash.
+// This prevents corrupted or tampered binaries from being applied.
+func DownloadAndVerifyUpdate(release *ReleaseInfo) (string, error) {
+	assetName := getAssetNameForPlatform()
+
+	// Find the download URL and expected size from the release assets.
+	var downloadURL string
+	var expectedSize int64
+	for _, asset := range release.Assets {
+		if asset.Name == assetName {
+			downloadURL = asset.BrowserDownloadURL
+			expectedSize = asset.Size
+			break
+		}
+	}
+	if downloadURL == "" {
+		return "", fmt.Errorf("asset %s not found in release %s", assetName, release.TagName)
+	}
+
+	// Download the binary.
+	path, err := DownloadUpdate(downloadURL)
+	if err != nil {
+		return "", err
+	}
+
+	// Verify file size matches GitHub API metadata.
+	info, err := os.Stat(path)
+	if err != nil {
+		os.Remove(path)
+		return "", fmt.Errorf("cannot stat downloaded file: %w", err)
+	}
+	if expectedSize > 0 && info.Size() != expectedSize {
+		os.Remove(path)
+		return "", fmt.Errorf("download size mismatch: expected %d bytes, got %d", expectedSize, info.Size())
+	}
+
+	// Look for a SHA256 checksums file in the release assets.
+	expectedHash, hashErr := fetchExpectedHash(release, assetName)
+	if hashErr == nil && expectedHash != "" {
+		actualHash, err := hashFileSHA256(path)
+		if err != nil {
+			os.Remove(path)
+			return "", fmt.Errorf("cannot hash downloaded file: %w", err)
+		}
+		if !strings.EqualFold(actualHash, expectedHash) {
+			os.Remove(path)
+			return "", fmt.Errorf("SHA256 mismatch: expected %s, got %s", expectedHash, actualHash)
+		}
+	}
+
+	return path, nil
+}
+
+// fetchExpectedHash looks for a checksums file in the release assets and
+// extracts the expected SHA256 hash for the named asset.
+func fetchExpectedHash(release *ReleaseInfo, assetName string) (string, error) {
+	var checksumURL string
+	for _, asset := range release.Assets {
+		lower := strings.ToLower(asset.Name)
+		if strings.Contains(lower, "checksum") ||
+			strings.HasSuffix(lower, ".sha256") ||
+			lower == "sha256sums" || lower == "sha256sums.txt" {
+			checksumURL = asset.BrowserDownloadURL
+			break
+		}
+	}
+	if checksumURL == "" {
+		return "", fmt.Errorf("no checksum file in release")
+	}
+
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Get(checksumURL)
+	if err != nil {
+		return "", fmt.Errorf("failed to download checksums: %w", err)
+	}
+	defer resp.Body.Close()
+
+	data, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20)) // 1 MB max
+	if err != nil {
+		return "", fmt.Errorf("failed to read checksums: %w", err)
+	}
+
+	// Parse "hash  filename" or "hash filename" format.
+	for _, line := range strings.Split(string(data), "\n") {
+		fields := strings.Fields(strings.TrimSpace(line))
+		if len(fields) >= 2 && strings.EqualFold(fields[len(fields)-1], assetName) {
+			return strings.ToLower(fields[0]), nil
+		}
+	}
+
+	return "", fmt.Errorf("hash for %s not found in checksums file", assetName)
+}
+
+// hashFileSHA256 returns the hex-encoded SHA256 hash of the file at path.
+func hashFileSHA256(path string) (string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+
+	h := sha256.New()
+	if _, err := io.Copy(h, f); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(h.Sum(nil)), nil
+}
+
+// CheckForUpdateFull is like CheckForUpdate but returns the full ReleaseInfo
+// for use with DownloadAndVerifyUpdate.
+func CheckForUpdateFull(currentVersion string) (*ReleaseInfo, error) {
+	currentVersion = strings.TrimPrefix(currentVersion, "v")
+
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Get(GitHubAPIURL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch release info: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("GitHub API returned status %d", resp.StatusCode)
+	}
+
+	var release ReleaseInfo
+	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
+		return nil, fmt.Errorf("failed to parse release info: %w", err)
+	}
+
+	return &release, nil
+}
+
+// atoiSafe converts a string to int, returning 0 for non-numeric values.
+func atoiSafe(s string) int {
+	n, err := strconv.Atoi(s)
+	if err != nil {
+		return 0
+	}
+	return n
 }

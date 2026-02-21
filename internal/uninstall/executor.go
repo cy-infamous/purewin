@@ -4,9 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"os/exec"
 	"regexp"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -76,11 +78,66 @@ func runMSIUninstall(cmdStr string, quiet bool) error {
 	return nil
 }
 
-// runUninstallCommand runs an arbitrary uninstall command string via cmd.exe.
+// parseExePath extracts the executable path from an uninstall command string.
+// Handles both quoted paths ("C:\Program Files\app.exe" /S) and unquoted
+// paths (C:\app\uninstall.exe /silent).
+func parseExePath(cmdStr string) string {
+	cmdStr = strings.TrimSpace(cmdStr)
+	if cmdStr == "" {
+		return ""
+	}
+
+	// Quoted executable: "C:\Program Files\App\uninstall.exe" /args
+	if cmdStr[0] == '"' {
+		end := strings.Index(cmdStr[1:], `"`)
+		if end >= 0 {
+			return cmdStr[1 : end+1]
+		}
+		return ""
+	}
+
+	// Unquoted: find the .exe boundary (case-insensitive).
+	lower := strings.ToLower(cmdStr)
+	if idx := strings.Index(lower, ".exe"); idx >= 0 {
+		return cmdStr[:idx+4]
+	}
+
+	// Fallback: first space-delimited token.
+	if i := strings.IndexByte(cmdStr, ' '); i >= 0 {
+		return cmdStr[:i]
+	}
+	return cmdStr
+}
+
+// runUninstallCommand executes an uninstall command string.
+// It first attempts direct execution (without cmd.exe) to prevent shell
+// metacharacter injection (e.g., & | > < chaining). Only falls back to
+// cmd /C when the executable can't be resolved on disk.
 func runUninstallCommand(cmdStr string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), uninstallTimeout)
 	defer cancel()
 
+	// Attempt direct execution: parse the exe path and verify it exists.
+	// This prevents command injection because CreateProcess does not
+	// interpret shell metacharacters like & | > <.
+	exe := parseExePath(cmdStr)
+	if exe != "" {
+		if _, statErr := os.Stat(exe); statErr == nil {
+			cmd := exec.CommandContext(ctx, exe)
+			cmd.SysProcAttr = &syscall.SysProcAttr{
+				CmdLine: cmdStr, // Pass the full command line verbatim.
+			}
+			output, err := cmd.CombinedOutput()
+			if err != nil {
+				return handleExitError(err, output)
+			}
+			return nil
+		}
+	}
+
+	// Fallback: use cmd /C for commands where the executable can't be
+	// resolved (e.g., PATH-relative executables). Most legitimate uninstall
+	// strings use absolute paths, so this path should be rare.
 	cmd := exec.CommandContext(ctx, "cmd.exe", "/C", cmdStr)
 	output, err := cmd.CombinedOutput()
 	if err != nil {

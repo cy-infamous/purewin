@@ -1,11 +1,13 @@
 package clean
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/lakshaymaurya-felt/purewin/internal/core"
 	"github.com/lakshaymaurya-felt/purewin/pkg/whitelist"
@@ -166,7 +168,10 @@ func CleanGoModCache(dryRun bool) (int64, error) {
 		return size, nil
 	}
 
-	cmd := exec.Command("go", "clean", "-modcache")
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, "go", "clean", "-modcache")
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return 0, fmt.Errorf("go clean -modcache failed: %w\n%s", err, strings.TrimSpace(string(output)))
 	}
@@ -212,7 +217,10 @@ func CleanDockerBuildCache(dryRun bool) (int64, error) {
 		return 0, nil
 	}
 
-	cmd := exec.Command("docker", "builder", "prune", "-af")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, "docker", "builder", "prune", "-af")
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return 0, fmt.Errorf("docker builder prune failed: %w\n%s", err, strings.TrimSpace(string(output)))

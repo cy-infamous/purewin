@@ -208,6 +208,9 @@ func RunMenu(items []MenuItem, title string) (string, error) {
 		return "", fmt.Errorf("menu error: %w", err)
 	}
 
-	result := final.(MenuModel)
+	result, ok := final.(MenuModel)
+	if !ok {
+		return "", fmt.Errorf("unexpected model type from menu")
+	}
 	return result.Selected(), nil
 }

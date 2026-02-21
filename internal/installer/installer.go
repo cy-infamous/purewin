@@ -1,6 +1,7 @@
 package installer
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -225,22 +226,23 @@ func isFileLocked(path string) bool {
 
 // CleanInstallers deletes the specified installer files.
 // Returns total bytes freed, number of files deleted, and any error.
+// All errors are accumulated and returned as a joined error.
 func CleanInstallers(files []InstallerFile, dryRun bool) (int64, int, error) {
 	var totalBytes int64
 	var totalCount int
-	var lastErr error
+	var errs []error
 
 	for _, file := range files {
 		freed, err := core.SafeDelete(file.Path, dryRun)
 		if err != nil {
-			lastErr = err
+			errs = append(errs, err)
 			continue
 		}
 		totalBytes += freed
 		totalCount++
 	}
 
-	return totalBytes, totalCount, lastErr
+	return totalBytes, totalCount, errors.Join(errs...)
 }
 
 // GroupBySource groups installer files by their source location.

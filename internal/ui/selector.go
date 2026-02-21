@@ -409,7 +409,10 @@ func RunSelector(items []SelectorItem, title string) ([]SelectorItem, error) {
 		return nil, fmt.Errorf("selector error: %w", err)
 	}
 
-	result := final.(SelectorModel)
+	result, ok := final.(SelectorModel)
+	if !ok {
+		return nil, fmt.Errorf("unexpected model type from selector")
+	}
 	if !result.Confirmed() {
 		return nil, nil
 	}

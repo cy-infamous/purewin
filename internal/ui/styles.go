@@ -6,6 +6,8 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
+
+	"github.com/lakshaymaurya-felt/purewin/internal/core"
 )
 
 // ─── Color Palette ───────────────────────────────────────────────────────────
@@ -321,30 +323,15 @@ func FocusBorder() lipgloss.Style {
 
 // ─── Formatting Helpers ──────────────────────────────────────────────────────
 
-// FormatSize returns a human-readable, styled file-size string.
-// Uses binary units (KiB, MiB, GiB, TiB) for precision.
+// FormatSize returns a human-readable, color-coded file-size string.
+// Delegates to core.FormatSize for the value and applies color styling.
 func FormatSize(bytes int64) string {
 	const (
-		_         = iota
-		kib int64 = 1 << (10 * iota)
-		mib
-		gib
-		tib
+		mib int64 = 1024 * 1024
+		gib       = mib * 1024
 	)
 
-	var size string
-	switch {
-	case bytes >= tib:
-		size = fmt.Sprintf("%.1f TiB", float64(bytes)/float64(tib))
-	case bytes >= gib:
-		size = fmt.Sprintf("%.1f GiB", float64(bytes)/float64(gib))
-	case bytes >= mib:
-		size = fmt.Sprintf("%.1f MiB", float64(bytes)/float64(mib))
-	case bytes >= kib:
-		size = fmt.Sprintf("%.1f KiB", float64(bytes)/float64(kib))
-	default:
-		size = fmt.Sprintf("%d B", bytes)
-	}
+	size := core.FormatSize(bytes)
 
 	// Color-code by magnitude: huge = cherry, large = orange, medium = blue, small = muted.
 	style := MutedStyle()
@@ -361,26 +348,9 @@ func FormatSize(bytes int64) string {
 }
 
 // FormatSizePlain returns a human-readable file-size string without any styling.
+// Delegates to core.FormatSize for consistent units across the application.
 func FormatSizePlain(bytes int64) string {
-	const (
-		_         = iota
-		kib int64 = 1 << (10 * iota)
-		mib
-		gib
-		tib
-	)
-	switch {
-	case bytes >= tib:
-		return fmt.Sprintf("%.1f TiB", float64(bytes)/float64(tib))
-	case bytes >= gib:
-		return fmt.Sprintf("%.1f GiB", float64(bytes)/float64(gib))
-	case bytes >= mib:
-		return fmt.Sprintf("%.1f MiB", float64(bytes)/float64(mib))
-	case bytes >= kib:
-		return fmt.Sprintf("%.1f KiB", float64(bytes)/float64(kib))
-	default:
-		return fmt.Sprintf("%d B", bytes)
-	}
+	return core.FormatSize(bytes)
 }
 
 // FormatPath truncates and styles a filesystem path to fit within maxWidth.

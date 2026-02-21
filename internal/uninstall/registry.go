@@ -4,6 +4,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"unicode"
 
 	"golang.org/x/sys/windows/registry"
 )
@@ -120,7 +121,26 @@ func readAppsFromKey(root registry.Key, path string) ([]InstalledApp, error) {
 	return apps, nil
 }
 
+// sanitizeRegistryString cleans a registry value for safe use.
+// It strips control characters (except tab) and limits length to prevent
+// display corruption or injection from malicious registry entries.
+func sanitizeRegistryString(s string, maxLen int) string {
+	if len(s) > maxLen {
+		s = s[:maxLen]
+	}
+	var b strings.Builder
+	b.Grow(len(s))
+	for _, r := range s {
+		if unicode.IsControl(r) && r != '\t' {
+			continue
+		}
+		b.WriteRune(r)
+	}
+	return strings.TrimSpace(b.String())
+}
+
 // readAppFromSubKey reads a single application's metadata from a registry key.
+// All string values are sanitized to prevent injection or display corruption.
 func readAppFromSubKey(root registry.Key, path string) (InstalledApp, error) {
 	key, err := registry.OpenKey(root, path, registry.QUERY_VALUE)
 	if err != nil {
@@ -129,14 +149,14 @@ func readAppFromSubKey(root registry.Key, path string) (InstalledApp, error) {
 	defer key.Close()
 
 	app := InstalledApp{
-		Name:                 readStringValue(key, "DisplayName"),
-		Version:              readStringValue(key, "DisplayVersion"),
-		Publisher:            readStringValue(key, "Publisher"),
-		InstallDate:          readStringValue(key, "InstallDate"),
-		UninstallString:      readStringValue(key, "UninstallString"),
-		QuietUninstallString: readStringValue(key, "QuietUninstallString"),
-		InstallLocation:      readStringValue(key, "InstallLocation"),
-		BundleID:             readStringValue(key, "BundleCachePath"),
+		Name:                 sanitizeRegistryString(readStringValue(key, "DisplayName"), 512),
+		Version:              sanitizeRegistryString(readStringValue(key, "DisplayVersion"), 128),
+		Publisher:            sanitizeRegistryString(readStringValue(key, "Publisher"), 256),
+		InstallDate:          sanitizeRegistryString(readStringValue(key, "InstallDate"), 32),
+		UninstallString:      sanitizeRegistryString(readStringValue(key, "UninstallString"), 2048),
+		QuietUninstallString: sanitizeRegistryString(readStringValue(key, "QuietUninstallString"), 2048),
+		InstallLocation:      sanitizeRegistryString(readStringValue(key, "InstallLocation"), 1024),
+		BundleID:             sanitizeRegistryString(readStringValue(key, "BundleCachePath"), 1024),
 	}
 
 	// EstimatedSize is stored in KB as a DWORD.

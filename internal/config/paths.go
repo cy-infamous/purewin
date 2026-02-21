@@ -49,6 +49,34 @@ func appData() string {
 	return os.Getenv("APPDATA")
 }
 
+// systemRoot returns the Windows directory (typically C:\Windows).
+// Falls back to C:\Windows if the environment variable is unset.
+func systemRoot() string {
+	if sr := os.Getenv("SystemRoot"); sr != "" {
+		return sr
+	}
+	return `C:\Windows`
+}
+
+// programData returns the ProgramData directory (typically C:\ProgramData).
+// Falls back to C:\ProgramData if the environment variable is unset.
+func programData() string {
+	if pd := os.Getenv("ProgramData"); pd != "" {
+		return pd
+	}
+	return `C:\ProgramData`
+}
+
+// systemDrive returns the system drive letter with trailing backslash (e.g. "C:\").
+// Derived from SystemRoot by taking the first 3 characters.
+func systemDrive() string {
+	sr := systemRoot()
+	if len(sr) >= 3 {
+		return sr[:3] // e.g. "C:\"
+	}
+	return `C:\`
+}
+
 // GetCleanTargets returns all available cleanup targets with paths expanded.
 func GetCleanTargets() []CleanTarget {
 	home := userProfile()
@@ -69,7 +97,7 @@ func GetCleanTargets() []CleanTarget {
 		// ── System Temp ─────────────────────────────────────────
 		{
 			Name:          "SystemTemp",
-			Paths:         []string{`C:\Windows\Temp`},
+			Paths:         []string{filepath.Join(systemRoot(), "Temp")},
 			Description:   "System temporary files",
 			RequiresAdmin: true,
 			Category:      "system",
@@ -222,7 +250,7 @@ func GetCleanTargets() []CleanTarget {
 		// ── System Caches ───────────────────────────────────────
 		{
 			Name:          "WindowsUpdateCache",
-			Paths:         []string{`C:\Windows\SoftwareDistribution\Download`},
+			Paths:         []string{filepath.Join(systemRoot(), "SoftwareDistribution", "Download")},
 			Description:   "Windows Update download cache",
 			RequiresAdmin: true,
 			Category:      "system",
@@ -230,7 +258,7 @@ func GetCleanTargets() []CleanTarget {
 		},
 		{
 			Name:          "CBSLogs",
-			Paths:         []string{`C:\Windows\Logs\CBS`},
+			Paths:         []string{filepath.Join(systemRoot(), "Logs", "CBS")},
 			Description:   "Component-Based Servicing logs",
 			RequiresAdmin: true,
 			Category:      "system",
@@ -238,7 +266,7 @@ func GetCleanTargets() []CleanTarget {
 		},
 		{
 			Name:          "DISMLogs",
-			Paths:         []string{`C:\Windows\Logs\DISM`},
+			Paths:         []string{filepath.Join(systemRoot(), "Logs", "DISM")},
 			Description:   "DISM operation logs",
 			RequiresAdmin: true,
 			Category:      "system",
@@ -249,8 +277,8 @@ func GetCleanTargets() []CleanTarget {
 			Paths: []string{
 				filepath.Join(local, "Microsoft", "Windows", "WER", "ReportArchive"),
 				filepath.Join(local, "Microsoft", "Windows", "WER", "ReportQueue"),
-				`C:\ProgramData\Microsoft\Windows\WER\ReportArchive`,
-				`C:\ProgramData\Microsoft\Windows\WER\ReportQueue`,
+				filepath.Join(programData(), "Microsoft", "Windows", "WER", "ReportArchive"),
+				filepath.Join(programData(), "Microsoft", "Windows", "WER", "ReportQueue"),
 			},
 			Description:   "Windows Error Reporting crash dumps and reports",
 			RequiresAdmin: false,
@@ -259,7 +287,7 @@ func GetCleanTargets() []CleanTarget {
 		},
 		{
 			Name:          "DeliveryOptimization",
-			Paths:         []string{`C:\Windows\SoftwareDistribution\DeliveryOptimization`},
+			Paths:         []string{filepath.Join(systemRoot(), "SoftwareDistribution", "DeliveryOptimization")},
 			Description:   "Delivery Optimization peer-to-peer update cache",
 			RequiresAdmin: true,
 			Category:      "system",
@@ -267,7 +295,7 @@ func GetCleanTargets() []CleanTarget {
 		},
 		{
 			Name:          "FontCache",
-			Paths:         []string{`C:\Windows\ServiceProfiles\LocalService\AppData\Local\FontCache`},
+			Paths:         []string{filepath.Join(systemRoot(), "ServiceProfiles", "LocalService", "AppData", "Local", "FontCache")},
 			Description:   "Windows font cache (rebuilds automatically)",
 			RequiresAdmin: true,
 			Category:      "system",
@@ -290,8 +318,8 @@ func GetCleanTargets() []CleanTarget {
 		{
 			Name: "MemoryDumps",
 			Paths: []string{
-				`C:\Windows\MEMORY.DMP`,
-				`C:\Windows\Minidump`,
+				filepath.Join(systemRoot(), "MEMORY.DMP"),
+				filepath.Join(systemRoot(), "Minidump"),
 			},
 			Description:   "Kernel and minidump crash files",
 			RequiresAdmin: true,
@@ -302,7 +330,7 @@ func GetCleanTargets() []CleanTarget {
 		// ── Windows.old ─────────────────────────────────────────
 		{
 			Name:          "WindowsOld",
-			Paths:         []string{`C:\Windows.old`},
+			Paths:         []string{filepath.Join(systemDrive(), "Windows.old")},
 			Description:   "Previous Windows installation (requires extra confirmation)",
 			RequiresAdmin: true,
 			Category:      "system",
@@ -334,24 +362,34 @@ func GetTargetsByCategory(category string) []CleanTarget {
 
 // GetNeverDeletePaths returns paths that must NEVER be deleted under any
 // circumstances. This list is hardcoded and not configurable.
+// Paths are derived from environment variables so they work on any drive.
 func GetNeverDeletePaths() []string {
+	sr := systemRoot()
+	sd := systemDrive()
+	pd := programData()
+
 	return []string{
-		`C:\Windows`,
-		`C:\Windows\System32`,
-		`C:\Windows\SysWOW64`,
-		`C:\Windows\WinSxS`,
-		`C:\Windows\assembly`,
-		`C:\Windows\System32\config`,
-		`C:\Boot`,
-		`C:\bootmgr`,
-		`C:\EFI`,
-		`C:\Program Files`,
-		`C:\Program Files (x86)`,
-		`C:\Users`,
-		`C:\ProgramData`,
-		`C:\Recovery`,
-		`C:\Windows\Installer`,
-		`C:\Windows\servicing`,
-		`C:\Windows\Prefetch`,
+		sr, // e.g. C:\Windows
+		filepath.Join(sr, "System32"),
+		filepath.Join(sr, "SysWOW64"),
+		filepath.Join(sr, "WinSxS"),
+		filepath.Join(sr, "assembly"),
+		filepath.Join(sr, "System32", "config"),
+		filepath.Join(sr, "Installer"),
+		filepath.Join(sr, "servicing"),
+		filepath.Join(sr, "Prefetch"),
+		filepath.Join(sd, "Boot"),
+		filepath.Join(sd, "bootmgr"),
+		filepath.Join(sd, "EFI"),
+		filepath.Join(sd, "Program Files"),
+		filepath.Join(sd, "Program Files (x86)"),
+		filepath.Join(sd, "Users"),
+		filepath.Join(sd, "Recovery"),
+		pd, // e.g. C:\ProgramData
+		filepath.Join(sd, "pagefile.sys"),
+		filepath.Join(sd, "swapfile.sys"),
+		filepath.Join(sd, "hiberfil.sys"),
+		filepath.Join(sd, "System Volume Information"),
+		filepath.Join(sd, "$Recycle.Bin"),
 	}
 }

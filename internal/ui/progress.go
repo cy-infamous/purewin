@@ -196,7 +196,9 @@ func (m ProgressBarModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case progress.FrameMsg:
 		model, cmd := m.bar.Update(msg)
-		m.bar = model.(progress.Model)
+		if pm, ok := model.(progress.Model); ok {
+			m.bar = pm
+		}
 		return m, cmd
 	}
 

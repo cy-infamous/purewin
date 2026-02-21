@@ -470,43 +470,16 @@ func (m StatusModel) renderStatusFooter() string {
 
 // ─── Drawing primitives ─────────────────────────────────────────────────────
 
-// renderSparkline renders a mini chart from float64 data using block chars.
-func renderSparkline(data []float64, width int, color lipgloss.AdaptiveColor) string {
-	blocks := []rune{'▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'}
-	var maxVal float64
-	for _, v := range data {
-		if v > maxVal {
-			maxVal = v
-		}
-	}
-	if maxVal == 0 {
-		maxVal = 1
-	}
-	d := data
-	if len(d) > width {
-		d = d[len(d)-width:]
-	}
-	var b strings.Builder
-	for _, v := range d {
-		idx := int(v / maxVal * 7)
-		if idx > 7 {
-			idx = 7
-		}
-		if idx < 0 {
-			idx = 0
-		}
-		b.WriteRune(blocks[idx])
-	}
-	for i := len(d); i < width; i++ {
-		b.WriteRune(blocks[0])
-	}
-	return lipgloss.NewStyle().Foreground(color).Render(b.String())
+// sparklineNum is the constraint for numeric types accepted by renderSparkline.
+type sparklineNum interface {
+	~float64 | ~uint64
 }
 
-// renderSparklineU64 renders a mini chart from uint64 data.
-func renderSparklineU64(data []uint64, width int, color lipgloss.AdaptiveColor) string {
+// renderSparkline renders a mini chart from numeric data using block chars.
+func renderSparkline[T sparklineNum](data []T, width int, color lipgloss.AdaptiveColor) string {
 	blocks := []rune{'▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'}
-	var maxVal uint64
+
+	var maxVal T
 	for _, v := range data {
 		if v > maxVal {
 			maxVal = v
@@ -515,10 +488,12 @@ func renderSparklineU64(data []uint64, width int, color lipgloss.AdaptiveColor) 
 	if maxVal == 0 {
 		maxVal = 1
 	}
+
 	d := data
 	if len(d) > width {
 		d = d[len(d)-width:]
 	}
+
 	var b strings.Builder
 	for _, v := range d {
 		idx := int(float64(v) / float64(maxVal) * 7)
@@ -534,6 +509,11 @@ func renderSparklineU64(data []uint64, width int, color lipgloss.AdaptiveColor) 
 		b.WriteRune(blocks[0])
 	}
 	return lipgloss.NewStyle().Foreground(color).Render(b.String())
+}
+
+// renderSparklineU64 is a convenience alias for uint64 sparklines.
+func renderSparklineU64(data []uint64, width int, color lipgloss.AdaptiveColor) string {
+	return renderSparkline(data, width, color)
 }
 
 // formatSpeed returns a human-readable bytes/sec string.
