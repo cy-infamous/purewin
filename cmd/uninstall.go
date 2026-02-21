@@ -12,14 +12,24 @@ import (
 )
 
 var uninstallCmd = &cobra.Command{
-	Use:   "uninstall",
+	Use:   "uninstall [path]",
 	Short: "Remove apps completely",
-	Long:  "Thoroughly remove applications along with their registry entries, data, and hidden remnants.",
-	Run:   runUninstall,
+	Long: `Thoroughly remove applications along with their registry entries, data, and hidden remnants.
+
+Defaults to showing only apps installed under the current drive/directory.
+Use --all to show all installed applications regardless of location.
+
+Examples:
+  pw uninstall              Show apps installed on the current drive
+  pw uninstall D:\Programs  Show apps installed under a specific path
+  pw uninstall --all        Show all installed applications`,
+	Args: cobra.MaximumNArgs(1),
+	Run:  runUninstall,
 }
 
 func init() {
 	uninstallCmd.Flags().BoolVar(&dryRun, "dry-run", false, "Preview without uninstalling")
+	uninstallCmd.Flags().Bool("all", false, "Show all installed apps regardless of location")
 	uninstallCmd.Flags().Bool("quiet", false, "Prefer silent uninstall commands")
 	uninstallCmd.Flags().Bool("show-all", false, "Show system components too")
 	uninstallCmd.Flags().String("search", "", "Search for apps by name")
@@ -27,8 +37,23 @@ func init() {
 
 func runUninstall(cmd *cobra.Command, args []string) {
 	quiet, _ := cmd.Flags().GetBool("quiet")
+	allFlag, _ := cmd.Flags().GetBool("all")
 	showAll, _ := cmd.Flags().GetBool("show-all")
 	search, _ := cmd.Flags().GetString("search")
+
+	// Determine filter path.
+	var filterPath string
+	if len(args) > 0 {
+		filterPath = args[0]
+	} else if !allFlag {
+		cwd, cwdErr := os.Getwd()
+		if cwdErr != nil {
+			fmt.Println(ui.ErrorStyle().Render(
+				fmt.Sprintf("  %s Cannot determine current directory: %v", ui.IconError, cwdErr)))
+			os.Exit(1)
+		}
+		filterPath = cwd
+	}
 
 	// Scan installed apps from the registry.
 	fmt.Println()
@@ -40,7 +65,14 @@ func runUninstall(cmd *cobra.Command, args []string) {
 		spin.StopWithError(fmt.Sprintf("Failed to read registry: %s", err))
 		os.Exit(1)
 	}
-	spin.Stop(fmt.Sprintf("Found %d installed applications", len(apps)))
+
+	// Filter to apps under the target path (unless --all).
+	if filterPath != "" {
+		apps = uninstall.FilterByPath(apps, filterPath)
+		spin.Stop(fmt.Sprintf("Found %d applications under %s", len(apps), filterPath))
+	} else {
+		spin.Stop(fmt.Sprintf("Found %d installed applications", len(apps)))
+	}
 
 	// Apply search filter if specified.
 	if search != "" {

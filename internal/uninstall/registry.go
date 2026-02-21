@@ -172,6 +172,29 @@ func readAppFromSubKey(root registry.Key, path string) (InstalledApp, error) {
 	return app, nil
 }
 
+// FilterByPath returns only apps whose InstallLocation is under the given path.
+// If path is a drive root (e.g. "D:\"), matches apps installed anywhere on that drive.
+// If path is deeper (e.g. "D:\Programs"), matches only apps under that directory.
+// Apps with no InstallLocation are excluded.
+func FilterByPath(apps []InstalledApp, path string) []InstalledApp {
+	normPath := strings.ToLower(strings.TrimRight(path, `\/`)) + `\`
+
+	var filtered []InstalledApp
+	for _, app := range apps {
+		loc := strings.TrimSpace(app.InstallLocation)
+		if loc == "" {
+			continue
+		}
+		normLoc := strings.ToLower(strings.TrimRight(loc, `\/`)) + `\`
+
+		// Check if the app's install location is under the given path.
+		if strings.HasPrefix(normLoc, normPath) {
+			filtered = append(filtered, app)
+		}
+	}
+	return filtered
+}
+
 // readStringValue safely reads a string value from a registry key.
 // Returns an empty string on any error.
 func readStringValue(key registry.Key, name string) string {
