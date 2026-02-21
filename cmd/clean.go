@@ -17,10 +17,21 @@ import (
 )
 
 var cleanCmd = &cobra.Command{
-	Use:   "clean",
+	Use:   "clean [path]",
 	Short: "Free up disk space",
-	Long:  "Deep cleanup of caches, logs, temp files, and browser leftovers to reclaim disk space.",
-	Run:   runClean,
+	Long: `Deep cleanup of caches, logs, temp files, and browser leftovers to reclaim disk space.
+
+When run without a path, performs a system-wide cleanup of known cache and temp locations.
+When given a path (directory or drive), scans that location for junk files — temp files, logs,
+caches, build artifacts, and OS-generated clutter.
+
+Examples:
+  pw clean              System-wide cleanup (default)
+  pw clean .            Scan current directory
+  pw clean D:\Projects  Scan a specific directory
+  pw clean D:\          Scan an entire drive`,
+	Args: cobra.MaximumNArgs(1),
+	Run:  runClean,
 }
 
 func init() {
@@ -31,6 +42,7 @@ func init() {
 	cleanCmd.Flags().Bool("system", false, "Clean system caches only (requires admin)")
 	cleanCmd.Flags().Bool("browser", false, "Clean browser caches only")
 	cleanCmd.Flags().Bool("dev", false, "Clean developer tool caches only")
+	cleanCmd.Flags().Int("depth", 0, "Maximum directory depth to scan (path mode only, 0 = unlimited)")
 }
 
 // ─── Main Entry Point ────────────────────────────────────────────────────────
@@ -60,6 +72,14 @@ func runClean(cmd *cobra.Command, args []string) {
 			fmt.Sprintf("  %s Could not load whitelist: %v", ui.IconWarning, wlErr)))
 		wl = nil
 	}
+
+	// ── Path mode: scan a specific directory ────────────────────────────
+	if len(args) > 0 {
+		runPathClean(cmd, args[0], cfg, wl, debugMode)
+		return
+	}
+
+	// ── System-wide mode (default) ──────────────────────────────────────
 
 	// Parse category flags.
 	allFlag, _ := cmd.Flags().GetBool("all")
@@ -340,6 +360,199 @@ func runClean(cmd *cobra.Command, args []string) {
 	}
 
 	// ── Completion Banner ────────────────────────────────────────────────
+	fmt.Println()
+	fmt.Println(ui.Divider(55))
+	fmt.Println()
+
+	successBanner := lipgloss.NewStyle().
+		Foreground(ui.ColorSuccess).
+		Bold(true)
+
+	fmt.Println(successBanner.Render(
+		fmt.Sprintf("  %s  Freed %s across %d items",
+			ui.IconSuccess, core.FormatSize(totalFreed), totalCleaned)))
+
+	if errCount > 0 {
+		fmt.Println(ui.WarningStyle().Render(
+			fmt.Sprintf("  %s  %d items skipped (locked, access denied, or safety check)",
+				ui.IconWarning, errCount)))
+	}
+	fmt.Println()
+}
+
+// ─── Path-Based Clean ────────────────────────────────────────────────────────
+
+// runPathClean handles `pw clean <path>` — scanning a specific directory for
+// junk files (temp, logs, caches, build artifacts, OS clutter) and offering
+// to delete them.
+func runPathClean(cmd *cobra.Command, target string, cfg *config.Config, wl *whitelist.Whitelist, debugMode bool) {
+	// Resolve "." and relative paths to absolute.
+	if !filepath.IsAbs(target) {
+		abs, err := filepath.Abs(target)
+		if err != nil {
+			fmt.Println(ui.ErrorStyle().Render(
+				fmt.Sprintf("  %s Cannot resolve path: %v", ui.IconError, err)))
+			os.Exit(1)
+		}
+		target = abs
+	}
+	target = filepath.Clean(target)
+
+	// Validate the path exists and is a directory.
+	info, err := os.Stat(target)
+	if err != nil {
+		fmt.Println(ui.ErrorStyle().Render(
+			fmt.Sprintf("  %s Cannot access %s: %v", ui.IconError, target, err)))
+		os.Exit(1)
+	}
+	if !info.IsDir() {
+		fmt.Println(ui.ErrorStyle().Render(
+			fmt.Sprintf("  %s Path is not a directory: %s", ui.IconError, target)))
+		os.Exit(1)
+	}
+
+	maxDepth, _ := cmd.Flags().GetInt("depth")
+
+	// ── Header ───────────────────────────────────────────────────────
+	fmt.Println()
+	fmt.Println(ui.SectionHeader("Path Clean", 55))
+	fmt.Printf("  Scanning: %s\n", ui.BoldStyle().Render(target))
+
+	if dryRun {
+		fmt.Println(ui.WarningStyle().Render(
+			fmt.Sprintf("  %s  DRY RUN MODE — no files will be deleted", ui.IconWarning)))
+	}
+	if maxDepth > 0 {
+		fmt.Println(ui.MutedStyle().Render(
+			fmt.Sprintf("  Max depth: %d", maxDepth)))
+	}
+	fmt.Println()
+
+	// ── Scan Phase ───────────────────────────────────────────────────
+	spinner := ui.NewInlineSpinner()
+	spinner.Start("Scanning for junk files...")
+
+	results := clean.ScanPath(target, wl, maxDepth)
+
+	spinner.Stop("Scan complete")
+
+	// ── Check for empty results ─────────────────────────────────────
+	totalSize := clean.PathScanTotalSize(results)
+	totalItems := clean.PathScanTotalItems(results)
+
+	if totalSize == 0 || totalItems == 0 {
+		fmt.Println()
+		fmt.Println(ui.SuccessStyle().Render(
+			fmt.Sprintf("  %s  Directory is clean! No junk files found.", ui.IconSuccess)))
+		fmt.Println()
+		return
+	}
+
+	// ── Display Results ─────────────────────────────────────────────
+	fmt.Println()
+	for _, r := range results {
+		fmt.Printf("    %-31s  %10s  %s\n",
+			r.Label,
+			ui.FormatSize(r.TotalSize),
+			ui.MutedStyle().Render(fmt.Sprintf("(%d items)", r.ItemCount)),
+		)
+	}
+
+	fmt.Println()
+	fmt.Println(ui.Divider(55))
+	fmt.Printf("  %-35s %s  %s\n",
+		ui.BoldStyle().Render("Total"),
+		ui.FormatSize(totalSize),
+		ui.MutedStyle().Render(fmt.Sprintf("(%d items)", totalItems)),
+	)
+	fmt.Println()
+
+	// ── Dry Run: Export and Exit ────────────────────────────────────
+	if dryRun {
+		drc := core.NewDryRunContext()
+		for _, r := range results {
+			for _, item := range r.Items {
+				drc.Add(item.Path, item.Size, item.Category)
+			}
+		}
+
+		drc.PrintSummary()
+
+		exportPath := filepath.Join(cfg.ConfigDir, "clean-path-list.txt")
+		if exportErr := drc.ExportToFile(exportPath); exportErr != nil {
+			fmt.Println(ui.WarningStyle().Render(
+				fmt.Sprintf("  %s  Could not export: %v", ui.IconWarning, exportErr)))
+		} else {
+			fmt.Println(ui.MutedStyle().Render(
+				fmt.Sprintf("  Report saved to %s", exportPath)))
+		}
+		fmt.Println()
+		return
+	}
+
+	// ── Confirm ─────────────────────────────────────────────────────
+	confirmed, confirmErr := ui.Confirm(
+		fmt.Sprintf("  Proceed to free %s?", core.FormatSize(totalSize)))
+	if confirmErr != nil || !confirmed {
+		fmt.Println(ui.MutedStyle().Render("  Cleanup cancelled."))
+		fmt.Println()
+		return
+	}
+
+	// ── Initialize Logger ───────────────────────────────────────────
+	logger, logErr := core.NewLogger(cfg.LogFile)
+	if logErr != nil {
+		if debugMode {
+			fmt.Println(ui.WarningStyle().Render(
+				fmt.Sprintf("  %s  Logging unavailable: %v", ui.IconWarning, logErr)))
+		}
+		logger = nil
+	} else {
+		defer logger.Close()
+		logger.LogSession("clean-path")
+	}
+
+	// ── Execute Cleanup ─────────────────────────────────────────────
+	cleanSpinner := ui.NewInlineSpinner()
+	cleanSpinner.Start("Cleaning...")
+
+	var totalFreed int64
+	var totalCleaned int
+	var errCount int
+
+	for _, r := range results {
+		for _, item := range r.Items {
+			cleanSpinner.UpdateMessage(
+				fmt.Sprintf("Cleaning %s...", filepath.Base(item.Path)))
+
+			freed, delErr := core.SafeDelete(item.Path, false)
+			if delErr != nil {
+				errCount++
+				if debugMode {
+					fmt.Printf("\n  %s %v\n", ui.IconError, delErr)
+				}
+				if logger != nil {
+					logger.Log("DELETE", item.Path, 0, delErr)
+				}
+				continue
+			}
+
+			totalFreed += freed
+			totalCleaned++
+			if logger != nil {
+				logger.Log("DELETE", item.Path, freed, nil)
+			}
+		}
+	}
+
+	cleanSpinner.Stop("Cleanup complete")
+
+	// Log session summary.
+	if logger != nil {
+		logger.LogSummary(totalFreed, totalCleaned, errCount)
+	}
+
+	// ── Completion Banner ───────────────────────────────────────────
 	fmt.Println()
 	fmt.Println(ui.Divider(55))
 	fmt.Println()
