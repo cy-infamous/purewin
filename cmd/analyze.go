@@ -14,7 +14,14 @@ import (
 var analyzeCmd = &cobra.Command{
 	Use:   "analyze [path]",
 	Short: "Explore disk usage",
-	Long:  "Interactive disk space analyzer with visual tree view.",
+	Long: `Interactive disk space analyzer with visual tree view.
+
+Defaults to the current working directory when no path is given.
+
+Examples:
+  pw analyze              Analyze current directory
+  pw analyze D:\Projects  Analyze a specific directory
+  pw analyze C:\          Analyze an entire drive`,
 	Args:  cobra.MaximumNArgs(1),
 	Run:   runAnalyze,
 }
@@ -26,18 +33,18 @@ func init() {
 }
 
 func runAnalyze(cmd *cobra.Command, args []string) {
-	// Determine target path (default: user home).
+	// Determine target path (default: current working directory).
 	target := ""
 	if len(args) > 0 {
 		target = args[0]
 	}
 	if target == "" {
-		home, err := os.UserHomeDir()
+		cwd, err := os.Getwd()
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			fmt.Fprintf(os.Stderr, "Error: cannot determine current directory: %v\n", err)
 			os.Exit(1)
 		}
-		target = home
+		target = cwd
 	}
 
 	// Validate the path exists.

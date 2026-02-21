@@ -16,14 +16,25 @@ import (
 )
 
 var purgeCmd = &cobra.Command{
-	Use:   "purge",
+	Use:   "purge [path]",
 	Short: "Clean project build artifacts",
-	Long:  "Find and remove build artifacts (node_modules, target, build, dist, etc.) from project directories.",
-	Run:   runPurge,
+	Long: `Find and remove build artifacts (node_modules, target, build, dist, etc.) from project directories.
+
+Defaults to scanning the current working directory when no path or flags are given.
+Use --all to scan all configured project directories.
+
+Examples:
+  pw purge                 Scan current directory for build artifacts
+  pw purge D:\Projects     Scan a specific directory
+  pw purge --all           Scan all configured project directories
+  pw purge --paths         Configure project scan directories`,
+	Args: cobra.MaximumNArgs(1),
+	Run:  runPurge,
 }
 
 func init() {
 	purgeCmd.Flags().BoolVar(&dryRun, "dry-run", false, "Preview without deleting")
+	purgeCmd.Flags().Bool("all", false, "Scan all configured project directories")
 	purgeCmd.Flags().Bool("paths", false, "Configure project scan directories")
 	purgeCmd.Flags().Int("min-age", 7, "Minimum age in days (recent projects are skipped)")
 	purgeCmd.Flags().String("min-size", "", "Minimum artifact size to show (e.g., 50MB)")
@@ -44,22 +55,58 @@ func runPurge(cmd *cobra.Command, args []string) {
 		return
 	}
 
+	allFlag, _ := cmd.Flags().GetBool("all")
+
+	// Determine scan paths.
+	var scanPaths []string
+	var scanLabel string
+
+	if len(args) > 0 {
+		// Explicit path argument.
+		target := args[0]
+		if !filepath.IsAbs(target) {
+			abs, absErr := filepath.Abs(target)
+			if absErr != nil {
+				fmt.Printf("%s Cannot resolve path: %v\n", ui.ErrorStyle().Render(ui.IconError), absErr)
+				os.Exit(1)
+			}
+			target = abs
+		}
+		scanPaths = []string{target}
+		scanLabel = target
+	} else if allFlag {
+		// --all: use configured/default project directories.
+		scanPaths = getScanPaths(cfg)
+		scanLabel = ""
+	} else {
+		// Default: scan current working directory.
+		cwd, cwdErr := os.Getwd()
+		if cwdErr != nil {
+			fmt.Printf("%s Cannot determine current directory: %v\n", ui.ErrorStyle().Render(ui.IconError), cwdErr)
+			os.Exit(1)
+		}
+		scanPaths = []string{cwd}
+		scanLabel = cwd
+	}
+
+	if len(scanPaths) == 0 {
+		fmt.Println()
+		fmt.Println(ui.MutedStyle().Render("  No scan paths configured. Run 'pw purge --paths' to configure."))
+		os.Exit(1)
+	}
+
 	// Start scanning
 	fmt.Println()
 	fmt.Println(ui.SectionHeader("Project Purge", 50))
+	if scanLabel != "" {
+		fmt.Printf("  Scanning: %s\n", ui.BoldStyle().Render(scanLabel))
+	} else {
+		fmt.Println(ui.MutedStyle().Render("  Scanning all configured project directories"))
+	}
 	fmt.Println()
 
 	spinner := ui.NewInlineSpinner()
 	spinner.Start("Scanning for project artifacts...")
-
-	// Get scan paths
-	scanPaths := getScanPaths(cfg)
-	if len(scanPaths) == 0 {
-		spinner.StopWithError("No scan paths configured")
-		fmt.Println()
-		fmt.Println(ui.MutedStyle().Render("  Run 'pw purge --paths' to configure scan directories."))
-		os.Exit(1)
-	}
 
 	// Scan for artifacts
 	artifacts, err := purge.ScanProjects(scanPaths)

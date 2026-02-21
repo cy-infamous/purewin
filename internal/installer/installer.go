@@ -79,11 +79,26 @@ func GetScanLocations() []scanLocation {
 	return locations
 }
 
-// ScanInstallers scans for installer files matching the criteria.
+// ScanInstallers scans default locations for installer files matching the criteria.
 // minAge is in days (0 = no age filter)
 // minSize is in bytes (0 = no size filter)
 func ScanInstallers(minAge int, minSize int64) ([]InstallerFile, error) {
 	locations := GetScanLocations()
+	return scanLocations(locations, minAge, minSize)
+}
+
+// ScanInstallersInPath scans a specific directory for installer files.
+// minAge is in days (0 = no age filter)
+// minSize is in bytes (0 = no size filter)
+func ScanInstallersInPath(path string, minAge int, minSize int64) ([]InstallerFile, error) {
+	locations := []scanLocation{
+		{Path: path, SourceLabel: filepath.Base(path)},
+	}
+	return scanLocations(locations, minAge, minSize)
+}
+
+// scanLocations scans the given locations for installer files.
+func scanLocations(locations []scanLocation, minAge int, minSize int64) ([]InstallerFile, error) {
 	var files []InstallerFile
 
 	cutoffTime := time.Time{}

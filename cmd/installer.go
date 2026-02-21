@@ -15,14 +15,24 @@ import (
 )
 
 var installerCmd = &cobra.Command{
-	Use:   "installer",
+	Use:   "installer [path]",
 	Short: "Find and remove installer files",
-	Long:  "Scan Downloads, Desktop, and package manager caches for installer files (.exe, .msi, .msix).",
-	Run:   runInstaller,
+	Long: `Scan for installer files (.exe, .msi, .msix) and large archives.
+
+Defaults to scanning the current working directory when no path or flags are given.
+Use --all to scan the default locations (Downloads, Desktop, Temp, package manager caches).
+
+Examples:
+  pw installer              Scan current directory
+  pw installer D:\ISOs      Scan a specific directory
+  pw installer --all        Scan Downloads, Desktop, Temp, and package manager caches`,
+	Args: cobra.MaximumNArgs(1),
+	Run:  runInstaller,
 }
 
 func init() {
 	installerCmd.Flags().BoolVar(&dryRun, "dry-run", false, "Preview without deleting")
+	installerCmd.Flags().Bool("all", false, "Scan default locations (Downloads, Desktop, Temp, package manager caches)")
 	installerCmd.Flags().Int("min-age", 0, "Minimum file age in days")
 	installerCmd.Flags().String("min-size", "", "Minimum file size (e.g., 10MB)")
 }
@@ -43,16 +53,46 @@ func runInstaller(cmd *cobra.Command, args []string) {
 		minSize = size
 	}
 
+	allFlag, _ := cmd.Flags().GetBool("all")
+
+	// Determine scan target.
+	var scanTarget string
+	if len(args) > 0 {
+		scanTarget = args[0]
+	}
+
 	// Start scanning
 	fmt.Println()
 	fmt.Println(ui.SectionHeader("Installer Cleanup", 50))
+
+	// Show what we're scanning.
+	if allFlag {
+		fmt.Println(ui.MutedStyle().Render("  Scanning default locations (Downloads, Desktop, Temp, package caches)"))
+	} else if scanTarget != "" {
+		fmt.Printf("  Scanning: %s\n", ui.BoldStyle().Render(scanTarget))
+	} else {
+		cwd, cwdErr := os.Getwd()
+		if cwdErr != nil {
+			fmt.Println(ui.ErrorStyle().Render(
+				fmt.Sprintf("  %s Cannot determine current directory: %v", ui.IconError, cwdErr)))
+			os.Exit(1)
+		}
+		scanTarget = cwd
+		fmt.Printf("  Scanning: %s\n", ui.BoldStyle().Render(scanTarget))
+	}
 	fmt.Println()
 
 	spinner := ui.NewInlineSpinner()
 	spinner.Start("Scanning for installer files...")
 
-	// Scan for installers
-	files, err := installer.ScanInstallers(minAge, minSize)
+	// Scan for installers.
+	var files []installer.InstallerFile
+	var err error
+	if allFlag {
+		files, err = installer.ScanInstallers(minAge, minSize)
+	} else {
+		files, err = installer.ScanInstallersInPath(scanTarget, minAge, minSize)
+	}
 	if err != nil {
 		spinner.StopWithError(fmt.Sprintf("Scan failed: %v", err))
 		os.Exit(1)
