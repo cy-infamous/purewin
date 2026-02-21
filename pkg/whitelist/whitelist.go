@@ -8,7 +8,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/lakshaymaurya-felt/purewin/internal/envutil"
+	"github.com/cy-infamous/purewin/internal/envutil"
 )
 
 // defaultPatterns are the initial whitelist entries that protect common

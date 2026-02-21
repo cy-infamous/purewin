@@ -6,7 +6,7 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/lakshaymaurya-felt/purewin/internal/ui"
+	"github.com/cy-infamous/purewin/internal/ui"
 )
 
 // ─── Charmtone Shell Palette ─────────────────────────────────────────────────

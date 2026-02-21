@@ -7,9 +7,9 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
 
-	"github.com/lakshaymaurya-felt/purewin/internal/core"
-	"github.com/lakshaymaurya-felt/purewin/internal/shell"
-	"github.com/lakshaymaurya-felt/purewin/internal/ui"
+	"github.com/cy-infamous/purewin/internal/core"
+	"github.com/cy-infamous/purewin/internal/shell"
+	"github.com/cy-infamous/purewin/internal/ui"
 )
 
 var (

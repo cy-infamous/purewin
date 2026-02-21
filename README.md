@@ -7,8 +7,8 @@
 <p align="center"><strong>Your Windows, purified.</strong></p>
 
 <p align="center">
-  <a href="https://github.com/lakshaymaurya-felt/purewin/actions/workflows/ci.yml"><img src="https://github.com/lakshaymaurya-felt/purewin/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
-  <a href="https://github.com/lakshaymaurya-felt/purewin"><img src="https://img.shields.io/github/go-mod/go-version/lakshaymaurya-felt/purewin" alt="Go Version" /></a>
+  <a href="https://github.com/cy-infamous/purewin/actions/workflows/ci.yml"><img src="https://github.com/cy-infamous/purewin/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+  <a href="https://github.com/cy-infamous/purewin"><img src="https://img.shields.io/github/go-mod/go-version/cy-infamous/purewin" alt="Go Version" /></a>
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT" /></a>
 </p>
 
@@ -79,16 +79,16 @@ Native. Fast. Uncompromising. This is Windows optimization done right.
 
 ### Via Go Install
 ```bash
-go install github.com/lakshaymaurya-felt/purewin@latest
+go install github.com/cy-infamous/purewin@latest
 ```
 
 ### Via PowerShell (one-liner)
 ```powershell
-irm https://raw.githubusercontent.com/lakshaymaurya-felt/purewin/main/scripts/install.ps1 | iex
+irm https://raw.githubusercontent.com/cy-infamous/purewin/main/scripts/install.ps1 | iex
 ```
 
 ### Via GitHub Releases
-Download the latest `.zip` from [Releases](https://github.com/lakshaymaurya-felt/purewin/releases), extract `pw.exe`, and add to your PATH.
+Download the latest `.zip` from [Releases](https://github.com/cy-infamous/purewin/releases), extract `pw.exe`, and add to your PATH.
 
 ---
 
@@ -200,14 +200,14 @@ Every destructive operation requires explicit user confirmation with detailed pr
 ## Building from Source
 
 ```bash
-git clone https://github.com/lakshaymaurya-felt/purewin.git
+git clone https://github.com/cy-infamous/purewin.git
 cd purewin
 go build -o pw.exe .
 ```
 
 ### Build with Version Info
 ```bash
-go build -ldflags="-X github.com/lakshaymaurya-felt/purewin/cmd.appVersion=1.0.0" -o pw.exe .
+go build -ldflags="-X github.com/cy-infamous/purewin/cmd.appVersion=1.0.0" -o pw.exe .
 ```
 
 ---

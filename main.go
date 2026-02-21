@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	"github.com/lakshaymaurya-felt/purewin/cmd"
+	"github.com/cy-infamous/purewin/cmd"
 )
 
 // Version info set via ldflags at build time.

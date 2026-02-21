@@ -3,8 +3,8 @@ package uninstall
 import (
 	"fmt"
 
-	"github.com/lakshaymaurya-felt/purewin/internal/core"
-	"github.com/lakshaymaurya-felt/purewin/internal/ui"
+	"github.com/cy-infamous/purewin/internal/core"
+	"github.com/cy-infamous/purewin/internal/ui"
 )
 
 // RunBatchUninstall presents a multi-select UI for the given applications,

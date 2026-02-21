@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/lakshaymaurya-felt/purewin/internal/core"
+	"github.com/cy-infamous/purewin/internal/core"
 )
 
 // ProjectArtifact represents a build artifact found in a project directory.

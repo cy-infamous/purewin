@@ -7,7 +7,7 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/lakshaymaurya-felt/purewin/internal/core"
+	"github.com/cy-infamous/purewin/internal/core"
 )
 
 // ─── Color Palette ───────────────────────────────────────────────────────────

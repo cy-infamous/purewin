@@ -6,8 +6,8 @@ import (
 	"sort"
 	"sync"
 
-	"github.com/lakshaymaurya-felt/purewin/internal/config"
-	"github.com/lakshaymaurya-felt/purewin/pkg/whitelist"
+	"github.com/cy-infamous/purewin/internal/config"
+	"github.com/cy-infamous/purewin/pkg/whitelist"
 )
 
 // ─── Data Structures ─────────────────────────────────────────────────────────

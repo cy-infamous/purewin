@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/lakshaymaurya-felt/purewin/internal/ui"
+	"github.com/cy-infamous/purewin/internal/ui"
 	"github.com/spf13/cobra"
 )
 

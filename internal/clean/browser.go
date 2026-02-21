@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/lakshaymaurya-felt/purewin/pkg/whitelist"
+	"github.com/cy-infamous/purewin/pkg/whitelist"
 )
 
 // ─── Browser Definitions ─────────────────────────────────────────────────────

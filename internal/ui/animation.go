@@ -113,7 +113,7 @@ func ShowBrandBanner() string {
 	b.WriteByte('\n')
 
 	// URL / attribution.
-	b.WriteString(InfoStyle().Render("  https://github.com/lakshaymaurya-felt/purewin"))
+	b.WriteString(InfoStyle().Render("  https://github.com/cy-infamous/purewin"))
 	b.WriteByte('\n')
 
 	return b.String()

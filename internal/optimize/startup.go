@@ -5,7 +5,7 @@ import (
 
 	"golang.org/x/sys/windows/registry"
 
-	"github.com/lakshaymaurya-felt/purewin/internal/ui"
+	"github.com/cy-infamous/purewin/internal/ui"
 )
 
 // StartupItem represents an application configured to run at startup.

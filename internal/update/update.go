@@ -18,7 +18,7 @@ import (
 
 const (
 	// GitHubAPIURL is the GitHub API endpoint for releases
-	GitHubAPIURL = "https://api.github.com/repos/lakshaymaurya-felt/purewin/releases/latest"
+	GitHubAPIURL = "https://api.github.com/repos/cy-infamous/purewin/releases/latest"
 
 	// UpdateCheckCacheFile stores the last update check result
 	UpdateCheckCacheFile = "last_update_check.json"

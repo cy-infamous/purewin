@@ -1,6 +1,6 @@
 #!/usr/bin/env pwsh
 # PureWin Installer for Windows
-# Usage: irm https://raw.githubusercontent.com/lakshaymaurya-felt/purewin/main/scripts/install.ps1 | iex
+# Usage: irm https://raw.githubusercontent.com/cy-infamous/purewin/main/scripts/install.ps1 | iex
 #
 # Safety: The entire script is wrapped in a function to prevent partial
 # execution if the download is interrupted during pipe-to-shell usage.
@@ -39,7 +39,7 @@ function Install-PureWin {
     # Fetch latest release info from GitHub API
     Write-Host "   Fetching latest release..." -ForegroundColor Gray
     try {
-        $releaseInfo = Invoke-RestMethod -Uri "https://api.github.com/repos/lakshaymaurya-felt/purewin/releases/latest"
+        $releaseInfo = Invoke-RestMethod -Uri "https://api.github.com/repos/cy-infamous/purewin/releases/latest"
         $version = $releaseInfo.tag_name
         # Strip leading 'v' for asset name (goreleaser uses version without v prefix)
         $versionNum = $version -replace '^v', ''

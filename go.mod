@@ -1,4 +1,4 @@
-module github.com/lakshaymaurya-felt/purewin
+module github.com/cy-infamous/purewin
 
 go 1.26.0
 

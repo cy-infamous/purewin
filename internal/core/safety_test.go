@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/lakshaymaurya-felt/purewin/internal/config"
+	"github.com/cy-infamous/purewin/internal/config"
 )
 
 // ---------------------------------------------------------------------------
