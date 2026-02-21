@@ -21,15 +21,18 @@ var cleanCmd = &cobra.Command{
 	Short: "Free up disk space",
 	Long: `Deep cleanup of caches, logs, temp files, and browser leftovers to reclaim disk space.
 
-When run without a path, performs a system-wide cleanup of known cache and temp locations.
-When given a path (directory or drive), scans that location for junk files — temp files, logs,
-caches, build artifacts, and OS-generated clutter.
+When run without arguments or category flags, scans the current working directory for junk —
+temp files, logs, caches, build artifacts, and OS-generated clutter.
+
+Use category flags (--all, --user, --system, --browser, --dev) for system-wide cleanup of
+known cache and temp locations.
 
 Examples:
-  pw clean              System-wide cleanup (default)
-  pw clean .            Scan current directory
-  pw clean D:\Projects  Scan a specific directory
-  pw clean D:\          Scan an entire drive`,
+  pw clean                 Scan current directory for junk
+  pw clean D:\Projects     Scan a specific directory
+  pw clean D:\             Scan an entire drive
+  pw clean --all           System-wide cleanup (all categories)
+  pw clean --user --dev    System-wide cleanup (user + dev caches only)`,
 	Args: cobra.MaximumNArgs(1),
 	Run:  runClean,
 }
@@ -73,13 +76,11 @@ func runClean(cmd *cobra.Command, args []string) {
 		wl = nil
 	}
 
-	// ── Path mode: scan a specific directory ────────────────────────────
+	// ── Path mode: explicit path argument ───────────────────────────────
 	if len(args) > 0 {
 		runPathClean(cmd, args[0], cfg, wl, debugMode)
 		return
 	}
-
-	// ── System-wide mode (default) ──────────────────────────────────────
 
 	// Parse category flags.
 	allFlag, _ := cmd.Flags().GetBool("all")
@@ -88,10 +89,19 @@ func runClean(cmd *cobra.Command, args []string) {
 	browserFlag, _ := cmd.Flags().GetBool("browser")
 	devFlag, _ := cmd.Flags().GetBool("dev")
 
-	// Default to all if no category specified.
+	// ── CWD mode: no path and no category flags → scan current directory
 	if !allFlag && !userFlag && !systemFlag && !browserFlag && !devFlag {
-		allFlag = true
+		cwd, cwdErr := os.Getwd()
+		if cwdErr != nil {
+			fmt.Println(ui.ErrorStyle().Render(
+				fmt.Sprintf("  %s Cannot determine current directory: %v", ui.IconError, cwdErr)))
+			os.Exit(1)
+		}
+		runPathClean(cmd, cwd, cfg, wl, debugMode)
+		return
 	}
+
+	// ── System-wide mode: category flags were set ───────────────────────
 
 	isAdmin := core.IsElevated()
 
