@@ -75,20 +75,63 @@ Native. Fast. Uncompromising. This is Windows optimization done right.
 
 ---
 
-## Quick Install
+## Installation
 
-### Via Go Install
-```bash
-go install github.com/cy-infamous/purewin@latest
-```
+### Method 1 — One-Line Install (Recommended)
 
-### Via PowerShell (one-liner)
+Open **PowerShell** and run:
+
 ```powershell
 irm https://raw.githubusercontent.com/cy-infamous/purewin/main/scripts/install.ps1 | iex
 ```
 
-### Via GitHub Releases
-Download the latest `.zip` from [Releases](https://github.com/cy-infamous/purewin/releases), extract `pw.exe`, and add to your PATH.
+This will:
+- Download the latest release for your architecture (amd64/arm64)
+- Install `pw.exe` to `%LOCALAPPDATA%\purewin\`
+- Add it to your PATH automatically
+- You may need to restart your terminal for PATH changes to take effect
+
+### Method 2 — Manual Download
+
+1. Go to the [Releases page](https://github.com/cy-infamous/purewin/releases/latest)
+2. Download `purewin_windows_amd64.exe` (most PCs) or `purewin_windows_arm64.exe` (ARM devices like Surface Pro X)
+3. Rename the file to `pw.exe`
+4. Move it to a folder in your PATH, or create one:
+   ```powershell
+   mkdir "$env:LOCALAPPDATA\purewin" -Force
+   move pw.exe "$env:LOCALAPPDATA\purewin\pw.exe"
+   # Add to PATH (run once):
+   $p = [Environment]::GetEnvironmentVariable("Path","User"); [Environment]::SetEnvironmentVariable("Path","$p;$env:LOCALAPPDATA\purewin","User")
+   ```
+5. Restart your terminal
+
+### Method 3 — Go Install
+
+Requires [Go 1.26+](https://go.dev/dl/):
+
+```bash
+go install github.com/cy-infamous/purewin@latest
+```
+
+The binary is placed in `$GOPATH/bin` (usually `%USERPROFILE%\go\bin`).
+
+### Method 4 — Build from Source
+
+```bash
+git clone https://github.com/cy-infamous/purewin.git
+cd purewin
+go build -o pw.exe .
+```
+
+### Verify Installation
+
+Open a **new** terminal and run:
+
+```bash
+pw version
+```
+
+You should see `PureWin version 2.0.0`.
 
 ---
 
@@ -205,10 +248,16 @@ cd purewin
 go build -o pw.exe .
 ```
 
-### Build with Version Info
+To embed version info into the binary:
+
 ```bash
-go build -ldflags="-X github.com/cy-infamous/purewin/cmd.appVersion=1.0.0" -o pw.exe .
+go build -ldflags="-s -w -X github.com/cy-infamous/purewin/cmd.appVersion=2.0.0" -o pw.exe .
 ```
+
+### Requirements
+
+- Go 1.26+ (download from [go.dev](https://go.dev/dl/))
+- Windows 10/11 (amd64 or arm64)
 
 ---
 
