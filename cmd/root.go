@@ -103,7 +103,7 @@ func runInteractiveShell() {
 	m.AppendOutput("")
 
 	for {
-		p := tea.NewProgram(m)
+		p := tea.NewProgram(m, tea.WithAltScreen())
 		finalModel, err := p.Run()
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "%s Shell error: %v\n", ui.IconError, err)

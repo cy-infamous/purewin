@@ -82,7 +82,7 @@ func (m ShellModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.Width = msg.Width
 		m.Height = msg.Height
-		return m, nil
+		return m, tea.ClearScreen
 
 	case tea.KeyMsg:
 		return m.handleKey(msg)
