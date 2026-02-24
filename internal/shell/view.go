@@ -116,6 +116,8 @@ var cmdIcons = map[string]string{
 }
 
 // View renders the complete shell interface.
+// The output always fills the full terminal height to prevent black-screen
+// artifacts when the terminal is resized or maximized.
 func (m ShellModel) View() string {
 	if m.Quitting {
 		return ""
@@ -126,34 +128,60 @@ func (m ShellModel) View() string {
 		w = 40
 	}
 
-	var s strings.Builder
+	// ── Bottom chrome (always rendered) ──
+	// separator (1 line) + prompt (1 line) + status bar (newline + content + newline = 3 lines)
+	const chromeLines = 5
+
+	// ── Build bottom chrome first so we know its line count ──
+	var chrome strings.Builder
+
+	// Input separator.
+	sepLine := strings.Repeat(ui.IconDashLight, w-4)
+	chrome.WriteString("  " + compBorder.Render(sepLine) + "\n")
+
+	// Prompt line.
+	chrome.WriteString(m.renderPrompt(w))
+
+	// Status bar.
+	chrome.WriteString(m.renderStatusBar(w))
+
+	// ── Completions popup (rendered above prompt) ──
+	compBlock := ""
+	compLines := 0
+	if m.completions.IsOpen() {
+		compBlock = m.renderCompletions(w)
+		compLines = strings.Count(compBlock, "\n")
+	}
 
 	showBanner := len(m.OutputLines) <= 1
 
-	// ── Welcome Banner (only on first launch, before any output) ──
+	// ── Main content area ──
+	var s strings.Builder
+
 	if showBanner {
-		s.WriteString(m.renderBanner(w))
+		// Banner fills available space via lipgloss.Place — already handles height.
+		// Adjust available height to account for completions overlay.
+		availH := m.Height - chromeLines - compLines
+		if availH < 10 {
+			availH = 10
+		}
+		s.WriteString(m.renderBannerWithHeight(w, availH))
+	} else {
+		// Output viewport — pad to fill available height.
+		availH := m.Height - chromeLines - compLines
+		if availH < 5 {
+			availH = 5
+		}
+		s.WriteString(m.renderOutputPadded(w, availH))
 	}
 
-	// ── Output Viewport (skip when banner owns the screen) ──
-	if !showBanner {
-		s.WriteString(m.renderOutput(w))
+	// Append completions overlay (sits between output and chrome).
+	if compBlock != "" {
+		s.WriteString(compBlock)
 	}
 
-	// ── Completions Popup (overlays above prompt) ──
-	if m.completions.IsOpen() {
-		s.WriteString(m.renderCompletions(w))
-	}
-
-	// ── Input Separator ──
-	sepLine := strings.Repeat(ui.IconDashLight, w-4)
-	s.WriteString("  " + compBorder.Render(sepLine) + "\n")
-
-	// ── Prompt Line ──
-	s.WriteString(m.renderPrompt(w))
-
-	// ── Status Bar ──
-	s.WriteString(m.renderStatusBar(w))
+	// Append bottom chrome.
+	s.WriteString(chrome.String())
 
 	return s.String()
 }
@@ -162,11 +190,12 @@ func (m ShellModel) View() string {
 // Full-screen welcome experience. Vertically centered, fills the terminal with
 // brand art, command cards, system info, and quick-start tips.
 
-func (m ShellModel) renderBanner(w int) string {
-	// Reserve lines for the chrome below the banner:
-	// separator (1) + prompt (1) + status bar newline+content+newline (3)
-	const chromeLines = 5
-	availH := m.Height - chromeLines
+// renderBannerWithHeight renders the banner filling exactly availH lines.
+func (m ShellModel) renderBannerWithHeight(w int, availH int) string {
+	return m.renderBanner(w, availH)
+}
+
+func (m ShellModel) renderBanner(w int, availH int) string {
 	if availH < 10 {
 		availH = 10
 	}
@@ -370,6 +399,23 @@ func (m ShellModel) renderWelcomeTips(w int) string {
 }
 
 // ─── Output Viewport ─────────────────────────────────────────────────────────
+
+// renderOutputPadded renders the output viewport and pads it to fill exactly
+// targetHeight lines. This prevents black-screen artifacts on terminal resize.
+func (m ShellModel) renderOutputPadded(w int, targetHeight int) string {
+	content := m.renderOutput(w)
+
+	// Count lines in the rendered content.
+	contentLines := strings.Count(content, "\n")
+
+	// Pad with empty lines to fill the target height.
+	if contentLines < targetHeight {
+		padding := targetHeight - contentLines
+		content += strings.Repeat("\n", padding)
+	}
+
+	return content
+}
 
 func (m ShellModel) renderOutput(w int) string {
 	if len(m.OutputLines) == 0 {
