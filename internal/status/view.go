@@ -48,6 +48,8 @@ func (m StatusModel) renderView() string {
 		s.WriteString(m.renderCPU(w))
 	case TabMemory:
 		s.WriteString(m.renderMemory(w))
+	case TabGPU:
+		s.WriteString(m.renderGPU(w))
 	case TabDisk:
 		s.WriteString(m.renderDisk(w))
 	case TabNetwork:
@@ -190,6 +192,22 @@ func (m StatusModel) renderOverview(w int) string {
 		s.WriteString(renderLineGraph(m.MemHistory, graphW, 6, ui.ColorSecondary, ""))
 	}
 	s.WriteString("\n")
+
+	// GPU
+	if met.GPU.Name != "" {
+		gpuDetail := met.GPU.Name
+		if met.GPU.MemoryTotal > 0 {
+			gpuDetail = fmt.Sprintf("%s / %s  %s",
+				core.FormatSize(int64(met.GPU.MemoryUsed)),
+				core.FormatSize(int64(met.GPU.MemoryTotal)),
+				dimStyle.Render("VRAM"))
+		}
+		s.WriteString(renderMetricRow("GPU", met.GPU.Utilization, barW, gpuDetail))
+		if len(m.GPUHistory) > 1 {
+			s.WriteString(renderLineGraph(m.GPUHistory, graphW, 6, lipgloss.AdaptiveColor{Light: "#8b5cf6", Dark: "#a78bfa"}, ""))
+		}
+		s.WriteString("\n")
+	}
 
 	// Disk
 	if len(met.Disk.Partitions) > 0 {
@@ -337,6 +355,101 @@ func (m StatusModel) renderMemory(w int) string {
 	return strings.Join(lines, "\n")
 }
 
+// ─── GPU tab ──────────────────────────────────────────────────────────────────
+
+func (m StatusModel) renderGPU(w int) string {
+	met := m.Metrics
+	gpu := met.GPU
+	barW := 40
+	if w > 110 {
+		barW = 56
+	}
+
+	gl := dimStyle
+	gv := accentStyle
+	gp := textStyle
+	gpuColor := lipgloss.AdaptiveColor{Light: "#8b5cf6", Dark: "#a78bfa"}
+	gpuAccent := lipgloss.NewStyle().Foreground(gpuColor)
+
+	var lines []string
+	lines = append(lines, "")
+
+	if gpu.Name == "" {
+		lines = append(lines, dimStyle.Italic(true).Render("  No GPU detected"))
+		return strings.Join(lines, "\n")
+	}
+
+	// ── GPU Name ──
+	lines = append(lines, "  "+ui.SectionHeader("Graphics Processor", barW+20))
+	lines = append(lines, fmt.Sprintf("  %s  %s",
+		gl.Render("Device   "),
+		gv.Bold(true).Render(gpu.Name)))
+	lines = append(lines, "")
+
+	// ── Utilization ──
+	lines = append(lines, "  "+ui.SectionHeader("Utilization", barW+20))
+	lines = append(lines,
+		fmt.Sprintf("  %s  %s  %s",
+			gl.Bold(true).Render("GPU      "),
+			ui.GradientBar(gpu.Utilization, barW),
+			gp.Render(fmt.Sprintf("%5.1f%%", gpu.Utilization))))
+	lines = append(lines, "")
+
+	// Line graph history.
+	if len(m.GPUHistory) > 1 {
+		lines = append(lines, renderLineGraph(m.GPUHistory, 40, 8, gpuColor, "GPU History"))
+	}
+
+	// ── Temperature & Power ──
+	if gpu.Temperature > 0 || gpu.PowerDraw > 0 {
+		lines = append(lines, "  "+ui.SectionHeader("Thermals & Power", barW+20))
+		if gpu.Temperature > 0 {
+			tempColor := lipgloss.AdaptiveColor{Light: "#22c55e", Dark: "#4ade80"}
+			if gpu.Temperature > 80 {
+				tempColor = lipgloss.AdaptiveColor{Light: "#ef4444", Dark: "#f87171"}
+			} else if gpu.Temperature > 65 {
+				tempColor = lipgloss.AdaptiveColor{Light: "#f59e0b", Dark: "#fbbf24"}
+			}
+			tempStyle := lipgloss.NewStyle().Foreground(tempColor)
+			lines = append(lines,
+				fmt.Sprintf("  %s  %s  %s",
+					gl.Render("Temp     "),
+					ui.GradientBar(gpu.Temperature/100*100, barW),
+					tempStyle.Render(fmt.Sprintf("%5.0f°C", gpu.Temperature))))
+		}
+		if gpu.PowerDraw > 0 {
+			powerLabel := fmt.Sprintf("%.1f W", gpu.PowerDraw)
+			if gpu.PowerLimit > 0 {
+				powerLabel += fmt.Sprintf(" / %.0f W", gpu.PowerLimit)
+			}
+			lines = append(lines,
+				fmt.Sprintf("  %s  %s", gl.Render("Power    "), gv.Render(powerLabel)))
+		}
+		lines = append(lines, "")
+	}
+
+	// ── VRAM ──
+	if gpu.MemoryTotal > 0 {
+		memPct := float64(gpu.MemoryUsed) / float64(gpu.MemoryTotal) * 100
+		lines = append(lines, "  "+ui.SectionHeader("VRAM", barW+20))
+		lines = append(lines,
+			fmt.Sprintf("  %s  %s  %s",
+				gl.Bold(true).Render("Used     "),
+				ui.GradientBar(memPct, barW),
+				gp.Render(fmt.Sprintf("%5.1f%%", memPct))))
+		lines = append(lines, "")
+		lines = append(lines,
+			fmt.Sprintf("  %s  %s", gl.Render("Total    "), gpuAccent.Render(core.FormatSize(int64(gpu.MemoryTotal)))))
+		lines = append(lines,
+			fmt.Sprintf("  %s  %s", gl.Render("Used     "), gpuAccent.Render(core.FormatSize(int64(gpu.MemoryUsed)))))
+		lines = append(lines,
+			fmt.Sprintf("  %s  %s", gl.Render("Free     "), gpuAccent.Render(core.FormatSize(int64(gpu.MemoryTotal-gpu.MemoryUsed)))))
+		lines = append(lines, "")
+	}
+
+	return strings.Join(lines, "\n")
+}
+
 // ─── Disk tab ────────────────────────────────────────────────────────────────
 
 func (m StatusModel) renderDisk(w int) string {
@@ -464,7 +577,7 @@ func (m StatusModel) renderProcesses(w int) string {
 // ─── Footer ──────────────────────────────────────────────────────────────────
 
 func (m StatusModel) renderStatusFooter() string {
-	hints := "  Tab/Shift-Tab switch  " + ui.IconPipe + "  1-6 jump  " + ui.IconPipe + "  q quit"
+	hints := "  Tab/Shift-Tab switch  " + ui.IconPipe + "  1-7 jump  " + ui.IconPipe + "  q quit"
 	footer := ui.HintBarStyle().Render(hints)
 
 	if m.Err != nil {

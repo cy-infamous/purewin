@@ -15,13 +15,13 @@ const (
 	TabOverview Tab = iota
 	TabCPU
 	TabMemory
+	TabGPU
 	TabDisk
 	TabNetwork
 	TabProcesses
 )
 
-// TabNames is the display label for each tab.
-var TabNames = []string{"Overview", "CPU", "Memory", "Disk", "Network", "Processes"}
+var TabNames = []string{"Overview", "CPU", "Memory", "GPU", "Disk", "Network", "Processes"}
 
 // ─── Messages ────────────────────────────────────────────────────────────────
 
@@ -50,6 +50,7 @@ type StatusModel struct {
 	NetRecvHistory []uint64
 	CPUHistory     []float64
 	MemHistory     []float64
+	GPUHistory     []float64
 }
 
 // NewStatusModel creates a StatusModel with the given refresh cadence.
@@ -115,10 +116,12 @@ func (m StatusModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "3":
 			m.Tab = TabMemory
 		case "4":
-			m.Tab = TabDisk
+			m.Tab = TabGPU
 		case "5":
-			m.Tab = TabNetwork
+			m.Tab = TabDisk
 		case "6":
+			m.Tab = TabNetwork
+		case "7":
 			m.Tab = TabProcesses
 		}
 		return m, nil
@@ -137,6 +140,7 @@ func (m StatusModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Append to sparkline histories (cap at 60).
 		m.CPUHistory = appendF64(m.CPUHistory, msg.metrics.CPU.TotalPercent, 60)
 		m.MemHistory = appendF64(m.MemHistory, msg.metrics.Memory.UsedPercent, 60)
+		m.GPUHistory = appendF64(m.GPUHistory, msg.metrics.GPU.Utilization, 60)
 		m.NetSendHistory = appendU64(m.NetSendHistory, msg.metrics.Network.SendSpeed, 60)
 		m.NetRecvHistory = appendU64(m.NetRecvHistory, msg.metrics.Network.RecvSpeed, 60)
 

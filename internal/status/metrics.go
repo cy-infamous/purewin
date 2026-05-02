@@ -79,6 +79,9 @@ type GPUInfo struct {
 	MemoryTotal uint64
 	MemoryUsed  uint64
 	Utilization float64
+	Temperature float64
+	PowerDraw   float64
+	PowerLimit  float64
 	AdapterRAM  uint32
 }
 

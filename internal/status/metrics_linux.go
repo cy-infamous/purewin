@@ -80,6 +80,9 @@ type GPUInfo struct {
 	MemoryTotal uint64
 	MemoryUsed  uint64
 	Utilization float64
+	Temperature float64
+	PowerDraw   float64
+	PowerLimit  float64
 	AdapterRAM  uint32
 }
 
@@ -412,7 +415,7 @@ func detectNvidiaGPU() GPUInfo {
 	}
 
 	out, err := exec.Command(path,
-		"--query-gpu=name,memory.total,memory.used,utilization.gpu",
+		"--query-gpu=name,memory.total,memory.used,utilization.gpu,temperature.gpu,power.draw,power.limit",
 		"--format=csv,noheader,nounits",
 	).Output()
 	if err != nil {
@@ -441,6 +444,21 @@ func detectNvidiaGPU() GPUInfo {
 	}
 	if v, err := strconv.ParseFloat(strings.TrimSpace(fields[3]), 64); err == nil {
 		gpu.Utilization = v
+	}
+	if len(fields) > 4 {
+		if v, err := strconv.ParseFloat(strings.TrimSpace(fields[4]), 64); err == nil {
+			gpu.Temperature = v
+		}
+	}
+	if len(fields) > 5 {
+		if v, err := strconv.ParseFloat(strings.TrimSpace(fields[5]), 64); err == nil {
+			gpu.PowerDraw = v
+		}
+	}
+	if len(fields) > 6 {
+		if v, err := strconv.ParseFloat(strings.TrimSpace(fields[6]), 64); err == nil {
+			gpu.PowerLimit = v
+		}
 	}
 
 	return gpu
