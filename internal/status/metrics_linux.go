@@ -4,8 +4,11 @@ package status
 
 import (
 	"os"
+	"os/exec"
 	"runtime"
 	"sort"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -71,11 +74,13 @@ type ProcessInfo struct {
 	MemPct float32
 }
 
-// GPUInfo holds basic GPU information.
-// On Linux there is no cross-platform WMI equivalent; zero values are returned.
+// GPUInfo holds GPU information detected via nvidia-smi or lspci.
 type GPUInfo struct {
-	Name       string
-	AdapterRAM uint32
+	Name        string
+	MemoryTotal uint64
+	MemoryUsed  uint64
+	Utilization float64
+	AdapterRAM  uint32
 }
 
 // BatteryInfo holds battery status (laptops only).
@@ -282,8 +287,14 @@ func CollectMetrics(prevNet *NetworkMetrics, interval time.Duration) (*SystemMet
 	}()
 
 	// ── GPU ──────────────────────────────────────────────────
-	// No cross-platform GPU detection on Linux; leave zero-valued.
-	// GPU info stays at default (empty) values.
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		gpu := detectGPU()
+		mu.Lock()
+		m.GPU = gpu
+		mu.Unlock()
+	}()
 
 	// ── Battery ──────────────────────────────────────────────
 	// gopsutil does not provide a reliable cross-platform battery API.
@@ -380,4 +391,98 @@ func HealthScore(m *SystemMetrics) int {
 		score = 0
 	}
 	return score
+}
+
+// ─── GPU Detection ──────────────────────────────────────────────────────────
+
+func detectGPU() GPUInfo {
+	if gpu := detectNvidiaGPU(); gpu.Name != "" {
+		return gpu
+	}
+	return detectLspciGPU()
+}
+
+func detectNvidiaGPU() GPUInfo {
+	path, err := exec.LookPath("nvidia-smi")
+	if err != nil {
+		return GPUInfo{}
+	}
+
+	out, err := exec.Command(path,
+		"--query-gpu=name,memory.total,memory.used,utilization.gpu",
+		"--format=csv,noheader,nounits",
+	).Output()
+	if err != nil {
+		return GPUInfo{}
+	}
+
+	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
+	if len(lines) == 0 {
+		return GPUInfo{}
+	}
+
+	fields := strings.Split(lines[0], ",")
+	if len(fields) < 4 {
+		return GPUInfo{}
+	}
+
+	gpu := GPUInfo{
+		Name: strings.TrimSpace(fields[0]),
+	}
+
+	if v, err := strconv.ParseUint(strings.TrimSpace(fields[1]), 10, 64); err == nil {
+		gpu.MemoryTotal = v * 1024 * 1024
+	}
+	if v, err := strconv.ParseUint(strings.TrimSpace(fields[2]), 10, 64); err == nil {
+		gpu.MemoryUsed = v * 1024 * 1024
+	}
+	if v, err := strconv.ParseFloat(strings.TrimSpace(fields[3]), 64); err == nil {
+		gpu.Utilization = v
+	}
+
+	return gpu
+}
+
+func detectLspciGPU() GPUInfo {
+	path, err := exec.LookPath("lspci")
+	if err != nil {
+		return GPUInfo{}
+	}
+
+	out, err := exec.Command(path).Output()
+	if err != nil {
+		return GPUInfo{}
+	}
+
+	var best string
+	for _, line := range strings.Split(string(out), "\n") {
+		lower := strings.ToLower(line)
+		if !strings.Contains(lower, "vga") && !strings.Contains(lower, "3d") && !strings.Contains(lower, "display") {
+			continue
+		}
+		idx := strings.Index(line, ": ")
+		if idx < 0 {
+			continue
+		}
+		name := strings.TrimSpace(line[idx+2:])
+
+		if strings.Contains(strings.ToLower(name), "nvidia") {
+			best = name
+			break
+		}
+		if strings.Contains(strings.ToLower(name), "amd") || strings.Contains(strings.ToLower(name), "radeon") {
+			if best == "" {
+				best = name
+			}
+			continue
+		}
+		if best == "" {
+			best = name
+		}
+	}
+
+	if best != "" {
+		return GPUInfo{Name: best}
+	}
+	return GPUInfo{}
 }

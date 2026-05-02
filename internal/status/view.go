@@ -135,7 +135,15 @@ func (m StatusModel) renderOverview(w int) string {
 		subtleStyle.Render(core.FormatSize(int64(hw.RAMTotal)) + " RAM"),
 	}
 	if met.GPU.Name != "" {
-		hwLine2Parts = append(hwLine2Parts, subtleStyle.Render(met.GPU.Name))
+		gpuLabel := met.GPU.Name
+		if met.GPU.MemoryTotal > 0 {
+			gpuLabel = fmt.Sprintf("%s (%s VRAM", met.GPU.Name, core.FormatSize(int64(met.GPU.MemoryTotal)))
+			if met.GPU.Utilization > 0 {
+				gpuLabel += fmt.Sprintf(", %.0f%% util", met.GPU.Utilization)
+			}
+			gpuLabel += ")"
+		}
+		hwLine2Parts = append(hwLine2Parts, subtleStyle.Render(gpuLabel))
 	}
 	hwLine2 := "  " + strings.Join(hwLine2Parts, dimStyle.Render("  ·  "))
 
