@@ -192,21 +192,18 @@ func (m ShellModel) renderBanner(w int) string {
 	// ── Build content blocks ──
 	brandBlock := m.renderWelcomeBrand()
 	infoBar := m.renderWelcomeInfoBar()
-	gpuBlock := m.renderWelcomeGPU(w)
 	cardsBlock := m.renderWelcomeCards(w)
 	tipsBlock := m.renderWelcomeTips(w)
 
-	blocks := []string{
+	content := lipgloss.JoinVertical(lipgloss.Center,
 		brandBlock,
 		"",
 		infoBar,
-	}
-	if gpuBlock != "" {
-		blocks = append(blocks, "", gpuBlock)
-	}
-	blocks = append(blocks, "", cardsBlock, "", tipsBlock)
-
-	content := lipgloss.JoinVertical(lipgloss.Center, blocks...)
+		"",
+		cardsBlock,
+		"",
+		tipsBlock,
+	)
 
 	// Center the whole block in the available space.
 	return lipgloss.Place(w, availH, lipgloss.Center, lipgloss.Center, content)
@@ -265,79 +262,6 @@ func (m ShellModel) renderWelcomeInfoBar() string {
 	parts = append(parts, welcomeVersionBadge.Render("v"+m.Version))
 
 	return strings.Join(parts, sep)
-}
-
-func (m ShellModel) renderWelcomeGPU(w int) string {
-	if m.GPUInfo == "" {
-		return ""
-	}
-
-	labelStyle := lipgloss.NewStyle().Foreground(ui.ColorMuted).Width(10)
-	valueStyle := lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#8b5cf6", Dark: "#a78bfa"})
-	barStyle := lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#8b5cf6", Dark: "#a78bfa"})
-
-	fields := strings.Split(m.GPUInfo, ",")
-	name := strings.TrimSpace(fields[0])
-
-	var lines []string
-
-	lines = append(lines, labelStyle.Render("GPU")+"  "+valueStyle.Bold(true).Render(name))
-
-	if len(fields) >= 5 {
-		memTotal := strings.TrimSpace(fields[1])
-		memUsed := strings.TrimSpace(fields[2])
-		util := strings.TrimSpace(fields[3])
-		temp := strings.TrimSpace(fields[4])
-
-		utilVal := 0.0
-		if v, err := parseFloat(util); err == nil {
-			utilVal = v
-		}
-		barW := 20
-		if w > 90 {
-			barW = 28
-		}
-		bar := renderGPUMiniBar(utilVal, barW, barStyle)
-
-		lines = append(lines, labelStyle.Render("Util")+"  "+bar+"  "+valueStyle.Render(fmt.Sprintf("%s%%", util)))
-
-		memLabel := fmt.Sprintf("%s / %s MiB VRAM", memUsed, memTotal)
-		lines = append(lines, labelStyle.Render("VRAM")+"  "+valueStyle.Render(memLabel))
-
-		tempLabel := fmt.Sprintf("%s°C", temp)
-		tempStyle := lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#22c55e", Dark: "#4ade80"})
-		if tv, err := parseFloat(temp); err == nil {
-			if tv > 80 {
-				tempStyle = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#ef4444", Dark: "#f87171"})
-			} else if tv > 65 {
-				tempStyle = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#f59e0b", Dark: "#fbbf24"})
-			}
-		}
-		lines = append(lines, labelStyle.Render("Temp")+"  "+tempStyle.Render(tempLabel))
-	}
-
-	block := lipgloss.JoinVertical(lipgloss.Left, lines...)
-	borderStyle := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.AdaptiveColor{Light: "#c4b5fd", Dark: "#7c3aed"}).
-		Padding(0, 2)
-	return borderStyle.Render(block)
-}
-
-func renderGPUMiniBar(pct float64, width int, style lipgloss.Style) string {
-	filled := int(pct / 100 * float64(width))
-	if filled > width {
-		filled = width
-	}
-	bar := strings.Repeat("█", filled) + strings.Repeat("░", width-filled)
-	return style.Render(bar)
-}
-
-func parseFloat(s string) (float64, error) {
-	s = strings.TrimSpace(s)
-	var f float64
-	_, err := fmt.Sscanf(s, "%f", &f)
-	return f, err
 }
 
 // cmdGroup holds metadata for a category card on the welcome screen.
