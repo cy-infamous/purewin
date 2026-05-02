@@ -1,3 +1,5 @@
+//go:build windows
+
 package installer
 
 import (
@@ -38,8 +40,12 @@ func GetScanLocations() []scanLocation {
 		{Path: temp, SourceLabel: "Temp"},
 	}
 
-	// Chocolatey cache
-	chocoCache := `C:\ProgramData\chocolatey\lib`
+	// Chocolatey cache — check CHOCOLATEY env var first, then default.
+	chocoRoot := os.Getenv("CHOCOLATEY")
+	if chocoRoot == "" {
+		chocoRoot = `C:\ProgramData\chocolatey`
+	}
+	chocoCache := filepath.Join(chocoRoot, "lib")
 	if _, err := os.Stat(chocoCache); err == nil {
 		locations = append(locations, scanLocation{
 			Path:        chocoCache,
@@ -196,8 +202,9 @@ func scanDirectoryForInstallers(path, sourceLabel string, minSize int64, cutoffT
 }
 
 // isFileLocked checks if a file is currently in use (running executable).
+// Uses read-only sharing to avoid false positives from antivirus, indexers,
+// and other readers. Only reports locked when even shared read is denied.
 func isFileLocked(path string) bool {
-	// Try to open the file with exclusive access
 	pathPtr, err := windows.UTF16PtrFromString(path)
 	if err != nil {
 		return false
@@ -205,8 +212,8 @@ func isFileLocked(path string) bool {
 
 	handle, err := windows.CreateFile(
 		pathPtr,
-		windows.GENERIC_READ|windows.GENERIC_WRITE,
-		0, // No sharing - exclusive access
+		windows.GENERIC_READ,
+		windows.FILE_SHARE_READ|windows.FILE_SHARE_WRITE|windows.FILE_SHARE_DELETE,
 		nil,
 		windows.OPEN_EXISTING,
 		windows.FILE_ATTRIBUTE_NORMAL,
@@ -214,11 +221,10 @@ func isFileLocked(path string) bool {
 	)
 
 	if err != nil {
-		// If we can't open it exclusively, it's likely locked
+		// If we can't open it even with shared read, it's likely locked
 		return true
 	}
 
-	// Close the handle immediately
 	_ = windows.CloseHandle(handle)
 	return false
 }

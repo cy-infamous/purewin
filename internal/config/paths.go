@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 
 	"github.com/lakshaymaurya-felt/purewin/internal/envutil"
 )
@@ -93,7 +94,15 @@ func programFilesX86() string {
 }
 
 // GetCleanTargets returns all available cleanup targets with paths expanded.
+// Returns platform-appropriate targets based on runtime.GOOS.
 func GetCleanTargets() []CleanTarget {
+	if runtime.GOOS == "linux" {
+		return getLinuxCleanTargets()
+	}
+	return getWindowsCleanTargets()
+}
+
+func getWindowsCleanTargets() []CleanTarget {
 	home := userProfile()
 	local := localAppData()
 	roaming := appData()
@@ -399,5 +408,222 @@ func GetNeverDeletePaths() []string {
 		filepath.Join(w, "Installer"),
 		filepath.Join(w, "servicing"),
 		filepath.Join(w, "Prefetch"),
+	}
+}
+
+// ─── Linux Targets ──────────────────────────────────────────────────────────
+
+// getLinuxCleanTargets returns cleanup targets for Linux systems.
+func getLinuxCleanTargets() []CleanTarget {
+	home := os.Getenv("HOME")
+	if home == "" {
+		home, _ = os.UserHomeDir()
+	}
+	cacheDir := os.Getenv("XDG_CACHE_HOME")
+	if cacheDir == "" {
+		cacheDir = filepath.Join(home, ".cache")
+	}
+	configDir := os.Getenv("XDG_CONFIG_HOME")
+	if configDir == "" {
+		configDir = filepath.Join(home, ".config")
+	}
+
+	return []CleanTarget{
+		// ── User Temp ───────────────────────────────────────
+		{
+			Name:          "UserTemp",
+			Paths:         []string{os.TempDir(), "/tmp", "/var/tmp"},
+			Description:   "Temporary files",
+			RequiresAdmin: false,
+			Category:      "user",
+			RiskLevel:     "low",
+		},
+
+		// ── User Cache ──────────────────────────────────────
+		{
+			Name:          "UserCache",
+			Paths:         []string{cacheDir},
+			Description:   "User cache directory (~/.cache)",
+			RequiresAdmin: false,
+			Category:      "user",
+			RiskLevel:     "medium",
+		},
+
+		// ── Browser Caches ──────────────────────────────────
+		{
+			Name: "ChromeCache",
+			Paths: []string{
+				filepath.Join(configDir, "google-chrome", "Default", "Cache"),
+				filepath.Join(configDir, "google-chrome", "Default", "Code Cache"),
+				filepath.Join(configDir, "google-chrome", "Default", "GPUCache"),
+				filepath.Join(configDir, "google-chrome", "Default", "Service Worker", "CacheStorage"),
+			},
+			Description:   "Google Chrome browser cache",
+			RequiresAdmin: false,
+			Category:      "browser",
+			RiskLevel:     "low",
+		},
+		{
+			Name: "ChromiumCache",
+			Paths: []string{
+				filepath.Join(configDir, "chromium", "Default", "Cache"),
+				filepath.Join(configDir, "chromium", "Default", "Code Cache"),
+				filepath.Join(configDir, "chromium", "Default", "GPUCache"),
+			},
+			Description:   "Chromium browser cache",
+			RequiresAdmin: false,
+			Category:      "browser",
+			RiskLevel:     "low",
+		},
+		{
+			Name: "FirefoxCache",
+			Paths: []string{
+				filepath.Join(home, ".mozilla", "firefox", "*", "cache2"),
+				filepath.Join(home, ".mozilla", "firefox", "*", "startupCache"),
+				filepath.Join(home, ".mozilla", "firefox", "*", "thumbnails"),
+			},
+			Description:   "Mozilla Firefox browser cache",
+			RequiresAdmin: false,
+			Category:      "browser",
+			RiskLevel:     "low",
+		},
+		{
+			Name: "BraveCache",
+			Paths: []string{
+				filepath.Join(configDir, "BraveSoftware", "Brave-Browser", "Default", "Cache"),
+				filepath.Join(configDir, "BraveSoftware", "Brave-Browser", "Default", "Code Cache"),
+				filepath.Join(configDir, "BraveSoftware", "Brave-Browser", "Default", "GPUCache"),
+			},
+			Description:   "Brave browser cache",
+			RequiresAdmin: false,
+			Category:      "browser",
+			RiskLevel:     "low",
+		},
+
+		// ── Developer Caches ────────────────────────────────
+		{
+			Name:          "NpmCache",
+			Paths:         []string{filepath.Join(cacheDir, "npm")},
+			Description:   "npm package manager cache",
+			RequiresAdmin: false,
+			Category:      "dev",
+			RiskLevel:     "low",
+		},
+		{
+			Name:          "PipCache",
+			Paths:         []string{filepath.Join(cacheDir, "pip")},
+			Description:   "Python pip package cache",
+			RequiresAdmin: false,
+			Category:      "dev",
+			RiskLevel:     "low",
+		},
+		{
+			Name:          "CargoCache",
+			Paths:         []string{filepath.Join(home, ".cargo", "registry", "cache")},
+			Description:   "Rust cargo registry cache",
+			RequiresAdmin: false,
+			Category:      "dev",
+			RiskLevel:     "low",
+		},
+		{
+			Name:          "GradleCache",
+			Paths:         []string{filepath.Join(home, ".gradle", "caches")},
+			Description:   "Gradle build cache",
+			RequiresAdmin: false,
+			Category:      "dev",
+			RiskLevel:     "low",
+		},
+		{
+			Name:          "GoModCache",
+			Paths:         []string{filepath.Join(home, "go", "pkg", "mod", "cache")},
+			Description:   "Go module download cache",
+			RequiresAdmin: false,
+			Category:      "dev",
+			RiskLevel:     "low",
+		},
+		{
+			Name:          "MavenCache",
+			Paths:         []string{filepath.Join(home, ".m2", "repository")},
+			Description:   "Maven repository cache",
+			RequiresAdmin: false,
+			Category:      "dev",
+			RiskLevel:     "medium",
+		},
+
+		// ── IDE Caches ──────────────────────────────────────
+		{
+			Name: "VSCodeCache",
+			Paths: []string{
+				filepath.Join(configDir, "Code", "Cache"),
+				filepath.Join(configDir, "Code", "CachedData"),
+				filepath.Join(configDir, "Code", "CachedExtensions"),
+				filepath.Join(configDir, "Code", "CachedExtensionVSIXs"),
+				filepath.Join(configDir, "Code", "logs"),
+			},
+			Description:   "Visual Studio Code cache and logs",
+			RequiresAdmin: false,
+			Category:      "dev",
+			RiskLevel:     "low",
+		},
+		{
+			Name: "JetBrainsCache",
+			Paths: []string{
+				filepath.Join(cacheDir, "JetBrains"),
+				filepath.Join(home, ".local", "share", "JetBrains", "*", "caches"),
+				filepath.Join(home, ".local", "share", "JetBrains", "*", "log"),
+				filepath.Join(home, ".local", "share", "JetBrains", "*", "tmp"),
+			},
+			Description:   "JetBrains IDE caches (IntelliJ, GoLand, etc.)",
+			RequiresAdmin: false,
+			Category:      "dev",
+			RiskLevel:     "medium",
+		},
+
+		// ── System Caches ───────────────────────────────────
+		{
+			Name:          "SystemCache",
+			Paths:         []string{"/var/cache"},
+			Description:   "System package cache (/var/cache)",
+			RequiresAdmin: true,
+			Category:      "system",
+			RiskLevel:     "medium",
+		},
+		{
+			Name:          "JournalLogs",
+			Paths:         []string{"/var/log/journal"},
+			Description:   "Systemd journal logs",
+			RequiresAdmin: true,
+			Category:      "system",
+			RiskLevel:     "low",
+		},
+		{
+			Name:          "ThumbnailCache",
+			Paths:         []string{filepath.Join(cacheDir, "thumbnails")},
+			Description:   "Desktop thumbnail cache",
+			RequiresAdmin: false,
+			Category:      "user",
+			RiskLevel:     "low",
+		},
+
+		// ── Trash ───────────────────────────────────────────
+		{
+			Name:          "Trash",
+			Paths:         []string{filepath.Join(home, ".local", "share", "Trash", "files")},
+			Description:   "User trash (freedesktop standard)",
+			RequiresAdmin: false,
+			Category:      "user",
+			RiskLevel:     "medium",
+		},
+	}
+}
+
+// GetNeverDeletePaths returns paths that must NEVER be deleted.
+func getLinuxNeverDeletePaths() []string {
+	return []string{
+		"/bin", "/sbin", "/usr/bin", "/usr/sbin",
+		"/lib", "/lib64", "/usr/lib", "/usr/lib64",
+		"/etc", "/boot", "/proc", "/sys", "/dev",
+		"/root", "/home",
+		"/var/lib", "/var/run",
 	}
 }

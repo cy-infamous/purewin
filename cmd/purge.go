@@ -12,6 +12,7 @@ import (
 	"github.com/lakshaymaurya-felt/purewin/internal/core"
 	"github.com/lakshaymaurya-felt/purewin/internal/purge"
 	"github.com/lakshaymaurya-felt/purewin/internal/ui"
+	"github.com/lakshaymaurya-felt/purewin/internal/util"
 	"github.com/spf13/cobra"
 )
 
@@ -19,7 +20,7 @@ var purgeCmd = &cobra.Command{
 	Use:   "purge",
 	Short: "Clean project build artifacts",
 	Long:  "Find and remove build artifacts (node_modules, target, build, dist, etc.) from project directories.",
-	Run:   runPurge,
+	RunE:  runPurge,
 }
 
 func init() {
@@ -29,19 +30,17 @@ func init() {
 	purgeCmd.Flags().String("min-size", "", "Minimum artifact size to show (e.g., 50MB)")
 }
 
-func runPurge(cmd *cobra.Command, args []string) {
+func runPurge(cmd *cobra.Command, args []string) error {
 	// Load config
 	cfg, err := config.Load()
 	if err != nil {
-		fmt.Printf("%s Failed to load config: %v\n", ui.ErrorStyle().Render(ui.IconError), err)
-		os.Exit(1)
+		return fmt.Errorf("failed to load config: %w", err)
 	}
 
 	// Check --paths flag
 	managePaths, _ := cmd.Flags().GetBool("paths")
 	if managePaths {
-		managePurgePaths(cfg)
-		return
+		return managePurgePaths(cfg)
 	}
 
 	// Start scanning
@@ -55,17 +54,13 @@ func runPurge(cmd *cobra.Command, args []string) {
 	// Get scan paths
 	scanPaths := getScanPaths(cfg)
 	if len(scanPaths) == 0 {
-		spinner.StopWithError("No scan paths configured")
-		fmt.Println()
-		fmt.Println(ui.MutedStyle().Render("  Run 'pw purge --paths' to configure scan directories."))
-		os.Exit(1)
+		return fmt.Errorf("no scan paths configured — run 'pw purge --paths' to configure")
 	}
 
 	// Scan for artifacts
 	artifacts, err := purge.ScanProjects(scanPaths)
 	if err != nil {
-		spinner.StopWithError(fmt.Sprintf("Scan failed: %v", err))
-		os.Exit(1)
+		return fmt.Errorf("scan failed: %w", err)
 	}
 
 	spinner.Stop(fmt.Sprintf("Found %d artifacts", len(artifacts)))
@@ -74,7 +69,7 @@ func runPurge(cmd *cobra.Command, args []string) {
 		fmt.Println()
 		fmt.Println(ui.SuccessStyle().Render(fmt.Sprintf("  %s No project artifacts found!", ui.IconCheck)))
 		fmt.Println()
-		return
+		return nil
 	}
 
 	// Convert to selector items
@@ -83,15 +78,14 @@ func runPurge(cmd *cobra.Command, args []string) {
 	// Show selector
 	selected, err := ui.RunSelector(items, "Select artifacts to delete:")
 	if err != nil {
-		fmt.Printf("%s Selector error: %v\n", ui.ErrorStyle().Render(ui.IconError), err)
-		os.Exit(1)
+		return fmt.Errorf("selector error: %w", err)
 	}
 
 	if selected == nil || len(selected) == 0 {
 		fmt.Println()
 		fmt.Println(ui.MutedStyle().Render("  No artifacts selected. Exiting."))
 		fmt.Println()
-		return
+		return nil
 	}
 
 	// Convert back to artifacts
@@ -121,14 +115,13 @@ func runPurge(cmd *cobra.Command, args []string) {
 	if !dryRun {
 		confirmed, err := ui.Confirm("Proceed with deletion?")
 		if err != nil {
-			fmt.Printf("%s Error: %v\n", ui.ErrorStyle().Render(ui.IconError), err)
-			os.Exit(1)
+			return fmt.Errorf("error: %w", err)
 		}
 		if !confirmed {
 			fmt.Println()
 			fmt.Println(ui.MutedStyle().Render("  Cancelled."))
 			fmt.Println()
-			return
+			return nil
 		}
 	}
 
@@ -151,6 +144,8 @@ func runPurge(cmd *cobra.Command, args []string) {
 		fmt.Printf("  Freed: %s from %d artifacts\n", ui.SuccessStyle().Render(core.FormatSize(freed)), count)
 		fmt.Println()
 	}
+
+	return nil
 }
 
 // getScanPaths returns the list of paths to scan for projects.
@@ -166,20 +161,31 @@ func getScanPaths(cfg *config.Config) []string {
 }
 
 // managePurgePaths opens the purge_paths file in the default editor.
-func managePurgePaths(cfg *config.Config) {
+func managePurgePaths(cfg *config.Config) error {
 	pathsFile := filepath.Join(cfg.ConfigDir, "purge_paths")
 
 	// Create file with defaults if it doesn't exist
 	if _, err := os.Stat(pathsFile); os.IsNotExist(err) {
 		defaults := purge.GetDefaultScanPaths()
 		if err := purge.SaveCustomScanPaths(cfg.ConfigDir, defaults); err != nil {
-			fmt.Printf("%s Failed to create purge_paths: %v\n", ui.ErrorStyle().Render(ui.IconError), err)
-			os.Exit(1)
+			return fmt.Errorf("failed to create purge_paths: %w", err)
 		}
 	}
 
 	// Try to open in default editor
 	editor := os.Getenv("EDITOR")
+	if editor == "" {
+		editor = os.Getenv("VISUAL")
+	}
+	// Try common editors before falling back to notepad.
+	if editor == "" {
+		for _, candidate := range []string{"code", "code-insiders", "notepad++", "notepad.exe"} {
+			if _, err := exec.LookPath(candidate); err == nil {
+				editor = candidate
+				break
+			}
+		}
+	}
 	if editor == "" {
 		editor = "notepad.exe"
 	}
@@ -197,6 +203,8 @@ func managePurgePaths(cfg *config.Config) {
 		fmt.Printf("%s Failed to open editor: %v\n", ui.WarningStyle().Render(ui.IconWarning), err)
 		fmt.Printf("  Edit manually: %s\n", pathsFile)
 	}
+
+	return nil
 }
 
 // artifactsToSelectorItems converts artifacts to selector items.
@@ -230,7 +238,7 @@ func artifactsToSelectorItems(artifacts []purge.ProjectArtifact) []ui.SelectorIt
 
 			// Age
 			age := time.Since(artifact.ModTime)
-			ageStr := formatDuration(age)
+			ageStr := util.FormatDuration(age)
 
 			item := ui.SelectorItem{
 				Label:       label,
@@ -247,37 +255,4 @@ func artifactsToSelectorItems(artifacts []purge.ProjectArtifact) []ui.SelectorIt
 	}
 
 	return items
-}
-
-// formatDuration formats a duration in human-readable format.
-func formatDuration(d time.Duration) string {
-	if d < 24*time.Hour {
-		hours := int(d.Hours())
-		if hours == 1 {
-			return "1 hour"
-		}
-		return fmt.Sprintf("%d hours", hours)
-	}
-
-	days := int(d.Hours() / 24)
-	if days == 1 {
-		return "1 day"
-	}
-	if days < 30 {
-		return fmt.Sprintf("%d days", days)
-	}
-
-	months := days / 30
-	if months == 1 {
-		return "1 month"
-	}
-	if months < 12 {
-		return fmt.Sprintf("%d months", months)
-	}
-
-	years := months / 12
-	if years == 1 {
-		return "1 year"
-	}
-	return fmt.Sprintf("%d years", years)
 }

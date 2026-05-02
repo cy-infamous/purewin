@@ -3,6 +3,7 @@ package shell
 import (
 	"os"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
@@ -395,9 +396,11 @@ func (m *ShellModel) viewportHeight() int {
 }
 
 // padRight pads a string to the given width with spaces.
+// Uses rune count for correct alignment with multi-byte Unicode characters.
 func padRight(s string, width int) string {
-	if len(s) >= width {
+	runeCount := utf8.RuneCountInString(s)
+	if runeCount >= width {
 		return s
 	}
-	return s + strings.Repeat(" ", width-len(s))
+	return s + strings.Repeat(" ", width-runeCount)
 }

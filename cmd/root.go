@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"os/exec"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -12,6 +13,7 @@ import (
 	"github.com/lakshaymaurya-felt/purewin/internal/core"
 	"github.com/lakshaymaurya-felt/purewin/internal/shell"
 	"github.com/lakshaymaurya-felt/purewin/internal/ui"
+	"github.com/lakshaymaurya-felt/purewin/internal/update"
 )
 
 var (
@@ -45,6 +47,9 @@ disk analysis, system optimization, and live monitoring.`,
 
 // Execute runs the root command.
 func Execute() error {
+	// Clean up leftover .old binary from a previous self-update.
+	update.CleanupOldBinary()
+
 	// Enable Windows Virtual Terminal Processing globally so ANSI escape
 	// codes render as colours in cmd.exe / PowerShell for ALL code paths
 	// (inline spinners, confirm dialogs, styled fmt.Print output, etc.).
@@ -72,7 +77,7 @@ func init() {
 	}
 
 	rootCmd.PersistentFlags().BoolVar(&debug, "debug", false, "Show detailed operation logs")
-	rootCmd.PersistentFlags().BoolVar(&runAdmin, "admin", false, "Re-launch PureWin with administrator privileges (UAC)")
+	rootCmd.PersistentFlags().BoolVar(&runAdmin, "admin", false, "Re-launch PureWin with elevated privileges")
 	rootCmd.PersistentFlags().BoolVar(&noColor, "no-color", false, "Disable colored output")
 
 	// PersistentPreRun: if --admin is set, re-launch elevated and exit.
@@ -98,8 +103,13 @@ func init() {
 		}
 		if err := core.RunElevated(elevatedArgs); err != nil {
 			fmt.Fprintf(os.Stderr, "%s %v\n", ui.IconError, err)
-			os.Exit(1)
+			// Use panic recovery instead of os.Exit to allow defers to run.
+			// Cobra will catch the panic from PersistentPreRun.
+			rootCmd.SilenceErrors = true
+			return
 		}
+		// sudo succeeded — parent process is done, child already ran.
+		os.Exit(0)
 	}
 
 	// Register all subcommands
@@ -114,6 +124,7 @@ func init() {
 	rootCmd.AddCommand(updateCmd)
 	rootCmd.AddCommand(removeCmd)
 	rootCmd.AddCommand(versionCmd)
+	rootCmd.AddCommand(whitelistCmd)
 }
 
 // runInteractiveShell launches the persistent interactive shell with
@@ -122,7 +133,6 @@ func init() {
 // exits, the command runs with full terminal control, then the shell
 // relaunches with preserved state (output history, command history).
 func runInteractiveShell() {
-	// If VT processing failed, use a simple text-based REPL
 	if !ui.IsVTEnabled() {
 		runSimpleShell()
 		return
@@ -156,10 +166,33 @@ func runInteractiveShell() {
 			cmdArgs := append([]string{result.ExecCmd}, result.ExecArgs...)
 			result.AppendOutput("")
 
-			// Run the subcommand via cobra.
-			rootCmd.SetArgs(cmdArgs)
-			if err := rootCmd.Execute(); err != nil {
-				result.AppendOutput("  Command failed: " + err.Error())
+			// Check if this command needs admin and we're not elevated.
+			needsAdmin := false
+			for _, cmd := range shell.AllCommands() {
+				if cmd.Name == result.ExecCmd && cmd.AdminHint {
+					needsAdmin = true
+					break
+				}
+			}
+
+			if needsAdmin && !core.IsElevated() && !dryRun {
+				// Re-run via sudo so the user gets a password prompt
+				// and sees the command output, then the TUI relaunches.
+				exe, _ := os.Executable()
+				sudoArgs := append([]string{exe}, cmdArgs...)
+				sudoCmd := exec.Command("sudo", sudoArgs...)
+				sudoCmd.Stdin = os.Stdin
+				sudoCmd.Stdout = os.Stdout
+				sudoCmd.Stderr = os.Stderr
+				if err := sudoCmd.Run(); err != nil {
+					result.AppendOutput(fmt.Sprintf("  %s Command failed: %v", ui.IconError, err))
+				}
+			} else {
+				// Normal execution via cobra.
+				rootCmd.SetArgs(cmdArgs)
+				if err := rootCmd.Execute(); err != nil {
+					result.AppendOutput("  Command failed: " + err.Error())
+				}
 			}
 
 			result.AppendOutput("")

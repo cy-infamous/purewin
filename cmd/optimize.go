@@ -2,7 +2,7 @@ package cmd
 
 import (
 	"fmt"
-	"os"
+	"runtime"
 
 	"github.com/spf13/cobra"
 
@@ -15,12 +15,11 @@ var optimizeCmd = &cobra.Command{
 	Use:   "optimize",
 	Short: "Check and maintain system",
 	Long:  "Refresh caches, restart services, and optimize system performance.",
-	Run:   runOptimize,
+	RunE:  runOptimize,
 }
 
 func init() {
 	optimizeCmd.Flags().BoolVar(&dryRun, "dry-run", false, "Preview optimization actions")
-	optimizeCmd.Flags().Bool("whitelist", false, "Manage protected optimization rules")
 	optimizeCmd.Flags().Bool("services", false, "Restart system services only")
 	optimizeCmd.Flags().Bool("maintenance", false, "Run maintenance tasks only")
 	optimizeCmd.Flags().Bool("startup", false, "Manage startup programs only")
@@ -33,7 +32,7 @@ type optimizeResult struct {
 	Error   error
 }
 
-func runOptimize(cmd *cobra.Command, args []string) {
+func runOptimize(cmd *cobra.Command, args []string) error {
 	servicesOnly, _ := cmd.Flags().GetBool("services")
 	maintenanceOnly, _ := cmd.Flags().GetBool("maintenance")
 	startupOnly, _ := cmd.Flags().GetBool("startup")
@@ -41,20 +40,24 @@ func runOptimize(cmd *cobra.Command, args []string) {
 	// If --startup, show startup items and return.
 	if startupOnly {
 		optimize.ListStartupItems()
-		return
+		return nil
 	}
 
 	// Fail fast: service and maintenance tasks require admin.
 	if !core.IsElevated() && !dryRun {
+		elevateHint := "pw --admin optimize"
+		if runtime.GOOS == "linux" {
+			elevateHint = "sudo pw optimize"
+		}
 		fmt.Println()
 		fmt.Println(ui.ErrorStyle().Render(
 			fmt.Sprintf("  %s  Optimization tasks require administrator privileges.", ui.IconError)))
 		fmt.Println(ui.MutedStyle().Render(
-			"  → Re-run with: pw --admin optimize"))
+			fmt.Sprintf("  → Re-run with: %s", elevateHint)))
 		fmt.Println(ui.MutedStyle().Render(
 			"  → Or use --dry-run to preview actions."))
 		fmt.Println()
-		os.Exit(1)
+		return fmt.Errorf("optimization tasks require administrator privileges")
 	}
 
 	fmt.Println()
@@ -76,6 +79,7 @@ func runOptimize(cmd *cobra.Command, args []string) {
 
 	// ── Summary ──
 	printOptimizeSummary(results)
+	return nil
 }
 
 // runServiceOptimizations executes service-related optimizations.
@@ -112,23 +116,23 @@ func runMaintenanceOptimizations() []optimizeResult {
 
 	var results []optimizeResult
 
-	results = append(results, runOptimizeTask("DISM component cleanup", func() error {
+	results = append(results, runOptimizeTask(optimize.TaskLabelDISM, func() error {
 		return optimize.RunDISMCleanup()
 	}))
 
-	results = append(results, runOptimizeTask("System file integrity check", func() error {
+	results = append(results, runOptimizeTask(optimize.TaskLabelSFC, func() error {
 		return optimize.RunSFCCheck()
 	}))
 
-	results = append(results, runOptimizeTask("Rebuild icon cache", func() error {
+	results = append(results, runOptimizeTask(optimize.TaskLabelIconCache, func() error {
 		return optimize.RebuildIconCache()
 	}))
 
-	results = append(results, runOptimizeTask("Rebuild search index", func() error {
+	results = append(results, runOptimizeTask(optimize.TaskLabelSearch, func() error {
 		return optimize.RebuildSearchIndex()
 	}))
 
-	results = append(results, runOptimizeTask("Clear event logs", func() error {
+	results = append(results, runOptimizeTask(optimize.TaskLabelEventLogs, func() error {
 		return optimize.ClearEventLogs()
 	}))
 

@@ -192,7 +192,10 @@ func runMainMenu() (string, error) {
 		return "", fmt.Errorf("menu error: %w", err)
 	}
 
-	result := final.(mainMenuModel)
+	result, ok := final.(mainMenuModel)
+	if !ok {
+		return "", fmt.Errorf("unexpected model type: %T", final)
+	}
 	if result.quitting && result.selected == "" {
 		return "", nil
 	}

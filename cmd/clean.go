@@ -26,7 +26,6 @@ var cleanCmd = &cobra.Command{
 
 func init() {
 	cleanCmd.Flags().BoolVar(&dryRun, "dry-run", false, "Preview the cleanup plan without deleting")
-	cleanCmd.Flags().Bool("whitelist", false, "Manage protected caches")
 	cleanCmd.Flags().Bool("all", false, "Clean all categories")
 	cleanCmd.Flags().Bool("user", false, "Clean user caches only")
 	cleanCmd.Flags().Bool("system", false, "Clean system caches only (requires admin)")
@@ -42,7 +41,7 @@ func runClean(cmd *cobra.Command, args []string) {
 	if err != nil {
 		fmt.Println(ui.ErrorStyle().Render(
 			fmt.Sprintf("  %s Failed to load config: %v", ui.IconError, err)))
-		os.Exit(1)
+		return
 	}
 
 	// Override dry-run from config if flag not explicitly set.

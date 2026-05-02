@@ -2,7 +2,6 @@ package analyze
 
 import (
 	"os/exec"
-	"path/filepath"
 	"runtime"
 	"time"
 	"unicode/utf8"
@@ -360,7 +359,6 @@ func (m *AnalyzeModel) navigateToEntry(entry *DirEntry) {
 // openInExplorer opens the parent folder of a path with the item selected.
 func openInExplorer(path string) {
 	if runtime.GOOS == "windows" {
-		dir := filepath.Dir(path)
-		_ = exec.Command("explorer", "/select,", dir).Start()
+		_ = exec.Command("explorer", "/select,", path).Start()
 	}
 }

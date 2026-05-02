@@ -84,12 +84,25 @@ var (
 // Kept local to the shell package so it's self-contained.
 
 var welcomeMascotLines = []string{
-	`    ╭●╮       ╭●╮    `,
-	`    ╰┬╯╭─────╮╰┬╯    `,
-	`     ╰─│ ◉ ◉ │─╯     `,
-	`       │ ╭─╮ │        `,
-	`       │ ╰▽╯ │        `,
-	`       ╰─────╯        `,
+	`       ██            `,
+	`     ██████          `,
+	`    ████████         `,
+	`   ██████████        `,
+	`   ██████████        `,
+	`  ████████████       `,
+	`  ████▓▓██████       `,
+	`  ████████████       `,
+	`  ████▓██████        `,
+	`  ████████████       `,
+	`  ████████████       `,
+	`  ████████████       `,
+	`  ████████████       `,
+	`  ████████████       `,
+	`   ██████████        `,
+	`    ████████         `,
+	` ████  ██  ████      `,
+	`████  ████  ████     `,
+	`██   ██  ██   ██    `,
 }
 
 var welcomeBrandLines = []string{
@@ -216,28 +229,17 @@ func (m ShellModel) renderBannerCompact(_ int, availH int) string {
 
 // renderWelcomeBrand renders the mascot + large ASCII wordmark + tagline.
 func (m ShellModel) renderWelcomeBrand() string {
-	mascotStyle := lipgloss.NewStyle().Foreground(ui.ColorSecondary)
 	artStyle := lipgloss.NewStyle().Foreground(ui.ColorPrimary).Bold(true)
 
-	// Mascot (matches assets/logo.svg).
-	var mascotBlock strings.Builder
-	for _, line := range welcomeMascotLines {
-		mascotBlock.WriteString(mascotStyle.Render(line))
-		mascotBlock.WriteByte('\n')
-	}
-
-	// Wordmark.
 	var artBlock strings.Builder
 	for _, line := range welcomeBrandLines {
 		artBlock.WriteString(artStyle.Render(line))
 		artBlock.WriteByte('\n')
 	}
 
-	tagline := bannerDesc.Render("Deep clean and optimize your Windows.")
+	tagline := bannerDesc.Render("Deep clean and optimize your system.")
 
 	return lipgloss.JoinVertical(lipgloss.Center,
-		strings.TrimRight(mascotBlock.String(), "\n"),
-		"",
 		strings.TrimRight(artBlock.String(), "\n"),
 		"",
 		tagline,

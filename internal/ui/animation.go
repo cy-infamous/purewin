@@ -1,3 +1,5 @@
+//go:build windows
+
 package ui
 
 import (
@@ -11,27 +13,42 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-// ─── ASCII Mascot Art ──────────────────────────────────────────────────────────
-// Matches the SVG logo (assets/logo.svg): a cute pet face with round ears,
-// dot eyes, and a snout with a nose.
+// ─── Mascot — Pixel ghost (6x7) ──────────────────────────────────────────────
 
-// mascotLines holds the raw ASCII mascot art, rendered line-by-line during intro.
 var mascotLines = []string{
-	`    ╭●╮       ╭●╮    `,
-	`    ╰┬╯╭─────╮╰┬╯    `,
-	`     ╰─│ ◉ ◉ │─╯     `,
-	`       │ ╭─╮ │        `,
-	`       │ ╰▽╯ │        `,
-	`       ╰─────╯        `,
+	`       ██            `,
+	`     ██████          `,
+	`    ████████         `,
+	`   ██████████        `,
+	`   ██████████        `,
+	`  ████████████       `,
+	`  ████▓▓██████       `,
+	`  ████████████       `,
+	`  ████▓██████        `,
+	`  ████████████       `,
+	`  ████████████       `,
+	`  ████████████       `,
+	`  ████████████       `,
+	`  ████████████       `,
+	`   ██████████        `,
+	`    ████████         `,
 }
 
-// groundLine is the terrain beneath the mascot.
-var groundLine = `    ─────────────────  `
+var waveFrame1 = []string{
+	` ████  ██  ████      `,
+	`████  ████  ████     `,
+	`██   ██  ██   ██    `,
+}
 
-// moleLines is kept as an alias for backward compatibility.
+var waveFrame2 = []string{
+	`████  ████  ████     `,
+	` ██  ██  ██  ██     `,
+	`  ████  ████  ██    `,
+}
+
+var groundLine = `                      `
 var moleLines = mascotLines
 
-// brandBanner is the large ASCII wordmark.
 var brandLines = []string{
 	"  ____                  __        ___       ",
 	" |  _ \\ _   _ _ __ ___ \\ \\      / (_)_ __  ",
@@ -40,42 +57,27 @@ var brandLines = []string{
 	" |_|    \\__,_|_|  \\___|   \\_/\\_/  |_|_| |_|",
 }
 
-// tagline sits below the brand banner.
-const tagline = "Deep clean and optimize your Windows."
+const tagline = "Deep clean and optimize your system."
 
 // ─── Terminal Detection ──────────────────────────────────────────────────────
 
-// vtEnabled tracks whether VT processing was successfully enabled.
 var vtEnabled bool
 
-// IsTerminal returns true if stdout is a terminal (not piped/redirected).
 func IsTerminal() bool {
 	return isatty.IsTerminal(os.Stdout.Fd()) || isatty.IsCygwinTerminal(os.Stdout.Fd())
 }
 
-// EnableVTProcessing enables Virtual Terminal Processing on the Windows console
-// so that ANSI escape codes work in cmd.exe and older PowerShell versions.
-// Also sets the console output code page to UTF-8 (65001) so Unicode characters
-// (box-drawing, braille spinners, icons) render correctly on all Windows 10+ consoles.
-// Returns true if VT processing was successfully enabled, false otherwise.
-// Safe to call multiple times; idempotent.
 func EnableVTProcessing() bool {
-	// Set console output to UTF-8 so Unicode characters render on all Windows
-	// consoles, including cmd.exe with the default OEM code page (437).
-	// Called unconditionally — safe on pipes and non-VT consoles.
 	windows.SetConsoleOutputCP(65001)
 
 	stdout := windows.Handle(os.Stdout.Fd())
 	var mode uint32
 
-	// If GetConsoleMode fails, stdout is not a console (piped/redirected).
 	if err := windows.GetConsoleMode(stdout, &mode); err != nil {
 		vtEnabled = false
 		return false
 	}
 
-	// Try to enable VT processing. On older Windows 10 builds (pre-1607),
-	// this may fail because ENABLE_VIRTUAL_TERMINAL_PROCESSING is not supported.
 	if err := windows.SetConsoleMode(stdout, mode|windows.ENABLE_VIRTUAL_TERMINAL_PROCESSING); err != nil {
 		vtEnabled = false
 		return false
@@ -85,68 +87,90 @@ func EnableVTProcessing() bool {
 	return true
 }
 
-// IsVTEnabled returns whether VT processing was successfully enabled.
 func IsVTEnabled() bool {
 	return vtEnabled
 }
 
+func GhostImage() string {
+	return ""
+}
+
 // ─── Intro Animation ─────────────────────────────────────────────────────────
 
-// ShowMoleIntro displays the animated mascot appearing line-by-line.
-// Only runs in interactive terminals; silently returns otherwise.
-// Dolly pink for the mascot, charple purple for the ground.
 func ShowMoleIntro() {
 	if !IsTerminal() {
 		return
 	}
 
-	// Ensure ANSI escape sequences work on Windows consoles.
 	EnableVTProcessing()
 
-	moleStyle := lipgloss.NewStyle().Foreground(ColorSecondary)
-	groundStyle := lipgloss.NewStyle().Foreground(ColorPrimary)
+	ghostStyle := lipgloss.NewStyle().Foreground(ColorSecondary)
+	nameStyle := lipgloss.NewStyle().Foreground(ColorPrimary).Bold(true)
 
-	// Clear screen.
 	fmt.Print("\033[2J\033[H")
 
-	// Animate mascot line by line.
 	for _, line := range mascotLines {
-		fmt.Println(moleStyle.Render(line))
-		time.Sleep(80 * time.Millisecond)
+		fmt.Println(ghostStyle.Render(line))
+		time.Sleep(50 * time.Millisecond)
 	}
 
-	// Ground with a brief pause.
-	fmt.Println(groundStyle.Render(groundLine))
-	time.Sleep(80 * time.Millisecond)
+	fmt.Println()
+	for _, line := range brandLines {
+		fmt.Println(nameStyle.Render(line))
+		time.Sleep(30 * time.Millisecond)
+	}
 
-	// Pause to admire the mascot.
-	time.Sleep(500 * time.Millisecond)
+	fmt.Println()
+	fmt.Println(MutedStyle().Italic(true).Render("  " + tagline))
 
-	// Clear screen before continuing to main UI.
+	waveRow1 := len(mascotLines)
+	waveRow2 := len(mascotLines) + 1
+	waveRow3 := len(mascotLines) + 2
+
+	for i := 0; i < 10; i++ {
+		var frame []string
+		if i%2 == 0 {
+			frame = waveFrame1
+		} else {
+			frame = waveFrame2
+		}
+
+		fmt.Printf("\033[%d;1H", waveRow1)
+		fmt.Println(ghostStyle.Render(frame[0]))
+		fmt.Printf("\033[%d;1H", waveRow2)
+		fmt.Println(ghostStyle.Render(frame[1]))
+		fmt.Printf("\033[%d;1H", waveRow3)
+		fmt.Println(ghostStyle.Render(frame[2]))
+
+		time.Sleep(250 * time.Millisecond)
+	}
+
+	fmt.Printf("\033[%d;1H", waveRow1)
+	fmt.Println(ghostStyle.Render(waveFrame1[0]))
+	fmt.Printf("\033[%d;1H", waveRow2)
+	fmt.Println(ghostStyle.Render(waveFrame1[1]))
+	fmt.Printf("\033[%d;1H", waveRow3)
+	fmt.Println(ghostStyle.Render(waveFrame1[2]))
+
+	time.Sleep(400 * time.Millisecond)
 	fmt.Print("\033[2J\033[H")
 }
 
 // ─── Brand Banner ────────────────────────────────────────────────────────────
 
-// ShowBrandBanner returns the full ASCII brand banner as a styled string,
-// ready to be printed. Charple purple wordmark, muted tagline, info-styled URL.
 func ShowBrandBanner() string {
 	var b strings.Builder
-
 	nameStyle := lipgloss.NewStyle().Foreground(ColorPrimary).Bold(true)
 
-	// ASCII wordmark.
 	for _, line := range brandLines {
 		b.WriteString(nameStyle.Render(line))
 		b.WriteByte('\n')
 	}
 	b.WriteByte('\n')
 
-	// Tagline.
 	b.WriteString(MutedStyle().Italic(true).Render("  " + tagline))
 	b.WriteByte('\n')
 
-	// URL / attribution.
 	b.WriteString(InfoStyle().Render("  https://github.com/lakshaymaurya-felt/purewin"))
 	b.WriteByte('\n')
 
@@ -155,12 +179,9 @@ func ShowBrandBanner() string {
 
 // ─── Completion Banner ───────────────────────────────────────────────────────
 
-// ShowCompletionBanner prints a post-operation summary with space freed,
-// current free space, and a styled checkmark.
 func ShowCompletionBanner(freed int64, freeSpace int64) {
 	fmt.Println()
 
-	// Build content
 	var content strings.Builder
 	content.WriteString(lipgloss.NewStyle().
 		Foreground(ColorSuccess).
@@ -174,25 +195,23 @@ func ShowCompletionBanner(freed int64, freeSpace int64) {
 		lipgloss.NewStyle().Foreground(ColorText).Render("Free space: "),
 		FormatSize(freeSpace)))
 
-	// Render in card
 	fmt.Println(CardStyle().Width(50).Render(content.String()))
 	fmt.Println()
 }
 
-// ─── Mascot Art (Static) ──────────────────────────────────────────────────────
+// ─── Mascot Art (Static) ─────────────────────────────────────────────────────
 
-// MoleArt returns the full mascot ASCII art as a single styled string.
-// Useful for embedding in help screens or about dialogs.
 func MoleArt() string {
-	moleStyle := lipgloss.NewStyle().Foreground(ColorSecondary)
-	groundStyle := lipgloss.NewStyle().Foreground(ColorPrimary)
+	ghostStyle := lipgloss.NewStyle().Foreground(ColorSecondary)
 
 	var b strings.Builder
 	for _, line := range mascotLines {
-		b.WriteString(moleStyle.Render(line))
+		b.WriteString(ghostStyle.Render(line))
 		b.WriteByte('\n')
 	}
-	b.WriteString(groundStyle.Render(groundLine))
-	b.WriteByte('\n')
+	for _, line := range waveFrame1 {
+		b.WriteString(ghostStyle.Render(line))
+		b.WriteByte('\n')
+	}
 	return b.String()
 }

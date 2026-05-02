@@ -35,7 +35,11 @@ func runStatus(cmd *cobra.Command, args []string) {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
 		}
-		data, _ := json.MarshalIndent(metrics, "", "  ")
+		data, err := json.MarshalIndent(metrics, "", "  ")
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error marshaling metrics: %v\n", err)
+			os.Exit(1)
+		}
 		fmt.Println(string(data))
 		return
 	}
@@ -51,7 +55,11 @@ func runStatus(cmd *cobra.Command, args []string) {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
 		}
-		data, _ := json.MarshalIndent(metrics, "", "  ")
+		data, err := json.MarshalIndent(metrics, "", "  ")
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error marshaling metrics: %v\n", err)
+			os.Exit(1)
+		}
 		fmt.Println(string(data))
 		return
 	}

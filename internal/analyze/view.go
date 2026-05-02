@@ -150,8 +150,9 @@ func (m AnalyzeModel) renderEntry(num int, entry *DirEntry, parentSize int64, ba
 		maxName = 12
 	}
 	name := entry.Name
-	if len(name) > maxName {
-		name = name[:maxName-1] + "…"
+	if utf8.RuneCountInString(name) > maxName {
+		runes := []rune(name)
+		name = string(runes[:maxName-1]) + "…"
 	}
 	nameStr := lipgloss.NewStyle().Foreground(nameColor).Bold(entry.IsDir).Render(name)
 

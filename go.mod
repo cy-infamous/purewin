@@ -1,6 +1,8 @@
 module github.com/lakshaymaurya-felt/purewin
 
-go 1.25.0
+go 1.24.2
+
+toolchain go1.24.3
 
 require (
 	github.com/charmbracelet/bubbles v1.0.0

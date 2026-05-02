@@ -16,7 +16,7 @@ const (
 	logTimeFormat = "2006-01-02 15:04:05"
 
 	// envNoOpLog is the environment variable to disable operation logging.
-	envNoOpLog = "WM_NO_OPLOG"
+	envNoOpLog = "PUREWIN_NO_OPLOG"
 )
 
 // Logger writes structured operation logs to a file.
@@ -28,7 +28,7 @@ type Logger struct {
 }
 
 // NewLogger creates a new Logger that writes to the given path.
-// If the WM_NO_OPLOG=1 environment variable is set, logging is disabled
+// If the PUREWIN_NO_OPLOG=1 environment variable is set, logging is disabled
 // and all operations become no-ops.
 func NewLogger(logPath string) (*Logger, error) {
 	l := &Logger{

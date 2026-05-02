@@ -15,7 +15,7 @@ import (
 
 const (
 	// GitHubAPIURL is the GitHub API endpoint for releases
-	GitHubAPIURL = "https://api.github.com/repos/lakshaymdev/purewin/releases/latest"
+	GitHubAPIURL = "https://api.github.com/repos/lakshaymaurya-felt/purewin/releases/latest"
 
 	// UpdateCheckCacheFile stores the last update check result
 	UpdateCheckCacheFile = "last_update_check.json"
@@ -169,9 +169,16 @@ func getAssetNamesForPlatform() []string {
 // DownloadUpdate downloads the update from the given URL to a temporary file.
 // Returns the path to the downloaded file.
 func DownloadUpdate(url string) (string, error) {
-	// Create temp file
-	tempDir := os.TempDir()
-	tempFile := filepath.Join(tempDir, "purewin_update.exe")
+	// Create temp file with a unique name to avoid race conditions.
+	tempFile, err := os.CreateTemp("", "purewin_update_*.exe")
+	if err != nil {
+		return "", fmt.Errorf("failed to create temp file: %w", err)
+	}
+	tempPath := tempFile.Name()
+	// Close it now — we'll reopen for writing below.
+	tempFile.Close()
+	// Remove the empty file so DownloadUpdate can create it fresh.
+	_ = os.Remove(tempPath)
 
 	// Download
 	client := &http.Client{Timeout: 5 * time.Minute}
@@ -186,7 +193,7 @@ func DownloadUpdate(url string) (string, error) {
 	}
 
 	// Write to file
-	out, err := os.Create(tempFile)
+	out, err := os.Create(tempPath)
 	if err != nil {
 		return "", fmt.Errorf("failed to create temp file: %w", err)
 	}
@@ -197,7 +204,7 @@ func DownloadUpdate(url string) (string, error) {
 		return "", fmt.Errorf("failed to write update: %w", err)
 	}
 
-	return tempFile, nil
+	return tempPath, nil
 }
 
 // ApplyUpdate replaces the current binary with the downloaded update.
@@ -239,7 +246,7 @@ func ApplyUpdate(tempPath string) error {
 	return nil
 }
 
-// copyFile copies a file from src to dst.
+// copyFile copies a file from src to dst, preserving the source file's permissions.
 func copyFile(src, dst string) error {
 	in, err := os.Open(src)
 	if err != nil {
@@ -247,7 +254,12 @@ func copyFile(src, dst string) error {
 	}
 	defer in.Close()
 
-	out, err := os.Create(dst)
+	info, err := in.Stat()
+	if err != nil {
+		return err
+	}
+
+	out, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, info.Mode())
 	if err != nil {
 		return err
 	}
@@ -385,15 +397,26 @@ func IsNewerVersion(current, newer string) bool {
 		// Get current part (default to 0 if missing)
 		currentVal := 0
 		if i < len(currentParts) {
-			// Try to parse as integer, ignore non-numeric parts
-			fmt.Sscanf(currentParts[i], "%d", &currentVal)
+			// Split on non-numeric prefix (e.g., "3-beta" → "3")
+			numericPart := currentParts[i]
+			if idx := strings.IndexFunc(numericPart, func(r rune) bool { return r < '0' || r > '9' }); idx > 0 {
+				numericPart = numericPart[:idx]
+			}
+			if numericPart != "" {
+				fmt.Sscanf(numericPart, "%d", &currentVal)
+			}
 		}
 
 		// Get newer part (default to 0 if missing)
 		newerVal := 0
 		if i < len(newerParts) {
-			// Try to parse as integer, ignore non-numeric parts
-			fmt.Sscanf(newerParts[i], "%d", &newerVal)
+			numericPart := newerParts[i]
+			if idx := strings.IndexFunc(numericPart, func(r rune) bool { return r < '0' || r > '9' }); idx > 0 {
+				numericPart = numericPart[:idx]
+			}
+			if numericPart != "" {
+				fmt.Sscanf(numericPart, "%d", &newerVal)
+			}
 		}
 
 		// Compare this part

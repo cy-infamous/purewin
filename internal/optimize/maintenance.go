@@ -1,3 +1,5 @@
+//go:build windows
+
 package optimize
 
 import (
@@ -8,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/lakshaymaurya-felt/purewin/internal/core"
 )
@@ -88,9 +91,9 @@ func RebuildIconCache() error {
 		_ = os.Remove(legacyCache)
 	}
 
-	// Restart explorer.exe.
-	startCmd := exec.Command("cmd.exe", "/C", "start", "explorer.exe")
-	_ = startCmd.Start() // Fire and forget.
+	// Restart explorer.exe directly.
+	startCmd := exec.Command("explorer.exe")
+	_ = startCmd.Start() // Fire and forget — Explorer manages its own lifecycle.
 
 	return nil
 }
@@ -128,10 +131,12 @@ func ClearEventLogs() error {
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 // truncateOutput trims and truncates command output for error messages.
+// Uses rune-safe truncation to avoid splitting multi-byte UTF-8 characters.
 func truncateOutput(output []byte, maxLen int) string {
 	s := strings.TrimSpace(string(output))
-	if len(s) > maxLen {
-		s = s[:maxLen] + "..."
+	if utf8.RuneCountInString(s) > maxLen {
+		runes := []rune(s)
+		s = string(runes[:maxLen]) + "..."
 	}
 	return s
 }

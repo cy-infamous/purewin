@@ -1,3 +1,5 @@
+//go:build windows
+
 package clean
 
 import (
@@ -46,7 +48,6 @@ var commonTempDirs = []string{
 	"Temp",
 	"tmp",
 	"temp",
-	"$RECYCLE.BIN", // per-drive recycle bin (system-managed, files inside are safe)
 }
 
 // commonJunkPatterns are file glob patterns for junk files found on any drive.
@@ -77,11 +78,6 @@ func ScanNonSystemDrives(wl *whitelist.Whitelist) []CleanItem {
 			dir := filepath.Join(root, tempDir)
 			info, err := os.Stat(dir)
 			if err != nil || !info.IsDir() {
-				continue
-			}
-
-			// Skip $RECYCLE.BIN — it's handled by the Shell API already.
-			if strings.EqualFold(tempDir, "$RECYCLE.BIN") {
 				continue
 			}
 

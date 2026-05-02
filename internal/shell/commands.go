@@ -47,7 +47,7 @@ func AllCommands() []CmdDef {
 		},
 		{
 			Name:        "optimize",
-			Description: "Speed up Windows with service tuning",
+			Description: "Optimize system performance and services",
 			Usage:       "/optimize [--dry-run] [--services|--maintenance|--startup]",
 			Mode:        ExecCobra,
 			AdminHint:   true,
@@ -80,6 +80,12 @@ func AllCommands() []CmdDef {
 			Name:        "update",
 			Description: "Check for PureWin updates",
 			Usage:       "/update [--force]",
+			Mode:        ExecCobra,
+		},
+		{
+			Name:        "remove",
+			Description: "Uninstall PureWin from this system",
+			Usage:       "/remove",
 			Mode:        ExecCobra,
 		},
 		{

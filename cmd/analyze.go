@@ -18,7 +18,7 @@ var analyzeCmd = &cobra.Command{
 	Short: "Explore disk usage",
 	Long:  "Interactive disk space analyzer with visual tree view.",
 	Args:  cobra.MaximumNArgs(1),
-	Run:   runAnalyze,
+	RunE:  runAnalyze,
 }
 
 func init() {
@@ -27,7 +27,7 @@ func init() {
 	analyzeCmd.Flags().StringSlice("exclude", nil, "Directories to exclude from scan")
 }
 
-func runAnalyze(cmd *cobra.Command, args []string) {
+func runAnalyze(cmd *cobra.Command, args []string) error {
 	// Determine target path (default: user home).
 	target := ""
 	if len(args) > 0 {
@@ -36,16 +36,14 @@ func runAnalyze(cmd *cobra.Command, args []string) {
 	if target == "" {
 		home, err := os.UserHomeDir()
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			os.Exit(1)
+			return fmt.Errorf("cannot determine home directory: %w", err)
 		}
 		target = home
 	}
 
 	// Validate the path exists.
 	if _, err := os.Stat(target); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: cannot access %s: %v\n", target, err)
-		os.Exit(1)
+		return fmt.Errorf("cannot access %s: %w", target, err)
 	}
 
 	// Parse exclude list.
@@ -85,8 +83,7 @@ func runAnalyze(cmd *cobra.Command, args []string) {
 		fmt.Fprint(os.Stderr, "\r\033[K") // clear spinner line
 
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error scanning: %v\n", err)
-			os.Exit(1)
+			return fmt.Errorf("error scanning: %w", err)
 		}
 
 		// Persist results for next time.
@@ -100,20 +97,18 @@ func runAnalyze(cmd *cobra.Command, args []string) {
 		fmt.Fprintln(os.Stderr, "Showing static summary instead.")
 		fmt.Fprintln(os.Stderr, "")
 		analyze.PrintStaticTree(root, depth, minSize)
-		return
+		return nil
 	}
 
 	// Launch the TUI.
 	model := analyze.NewAnalyzeModel(root, depth, minSize)
 	p := tea.NewProgram(model, tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("error: %w", err)
 	}
+	return nil
 }
 
-// parseMinSize parses a human-readable size string (e.g., "100MB", "1GB") into bytes.
-// Returns 0 if the string is empty or invalid.
 // parseMinSize parses a human-readable size string (e.g., "100MB", "1GB") into bytes.
 // Returns 0 if the string is empty or invalid. Supported suffixes: B, KB, MB, GB, TB.
 func parseMinSize(s string) int64 {
