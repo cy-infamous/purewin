@@ -73,10 +73,13 @@ type ProcessInfo struct {
 	MemPct float32
 }
 
-// GPUInfo holds basic GPU information from WMI.
+// GPUInfo holds GPU information from WMI.
 type GPUInfo struct {
-	Name       string
-	AdapterRAM uint32
+	Name        string
+	MemoryTotal uint64
+	MemoryUsed  uint64
+	Utilization float64
+	AdapterRAM  uint32
 }
 
 // BatteryInfo holds battery status (laptops only).
