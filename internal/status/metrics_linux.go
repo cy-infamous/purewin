@@ -3,6 +3,7 @@
 package status
 
 import (
+	"bufio"
 	"os"
 	"os/exec"
 	"runtime"
@@ -399,7 +400,10 @@ func detectGPU() GPUInfo {
 	if gpu := detectNvidiaGPU(); gpu.Name != "" {
 		return gpu
 	}
-	return detectLspciGPU()
+	if gpu := detectLspciGPU(); gpu.Name != "" {
+		return gpu
+	}
+	return detectSysDRMGPU()
 }
 
 func detectNvidiaGPU() GPUInfo {
@@ -485,4 +489,95 @@ func detectLspciGPU() GPUInfo {
 		return GPUInfo{Name: best}
 	}
 	return GPUInfo{}
+}
+
+func detectSysDRMGPU() GPUInfo {
+	entries, err := os.ReadDir("/sys/class/drm")
+	if err != nil {
+		return GPUInfo{}
+	}
+
+	for _, entry := range entries {
+		cardPath := "/sys/class/drm/" + entry.Name()
+		devicePath := cardPath + "/device/driver"
+		link, err := os.Readlink(devicePath)
+		if err != nil {
+			continue
+		}
+
+		vendorPath := cardPath + "/device/vendor"
+		data, err := os.ReadFile(vendorPath)
+		if err != nil {
+			continue
+		}
+		vendor := strings.TrimSpace(string(data))
+
+		driverName := ""
+		if idx := strings.LastIndex(link, "/"); idx >= 0 {
+			driverName = link[idx+1:]
+		}
+
+		ueventPath := cardPath + "/device/uevent"
+		ueventData, _ := os.ReadFile(ueventPath)
+		uevent := string(ueventData)
+
+		name := ""
+		for _, line := range strings.Split(uevent, "\n") {
+			if strings.HasPrefix(line, "PCI_ID=") {
+				name = gpuNameFromIDs(vendor, strings.TrimPrefix(line, "PCI_ID="), driverName)
+				break
+			}
+		}
+
+		if name == "" {
+			switch {
+			case strings.Contains(vendor, "10de"):
+				name = "NVIDIA GPU"
+			case strings.Contains(vendor, "1002"):
+				name = "AMD GPU"
+			case strings.Contains(vendor, "8086"):
+				name = "Intel GPU"
+			default:
+				continue
+			}
+		}
+
+		return GPUInfo{Name: name}
+	}
+
+	return GPUInfo{}
+}
+
+func gpuNameFromIDs(vendor, pciID, driver string) string {
+	switch {
+	case strings.Contains(vendor, "10de"):
+		return "NVIDIA GPU"
+	case strings.Contains(vendor, "1002"):
+		return "AMD GPU"
+	case strings.Contains(vendor, "8086"):
+		parts := strings.Split(pciID, ":")
+		if len(parts) == 2 {
+			return "Intel Graphics (" + parts[1] + ")"
+		}
+		return "Intel GPU"
+	default:
+		if driver != "" {
+			return driver + " GPU"
+		}
+		return ""
+	}
+}
+
+func readFirstLine(path string) string {
+	f, err := os.Open(path)
+	if err != nil {
+		return ""
+	}
+	defer f.Close()
+
+	scanner := bufio.NewScanner(f)
+	if scanner.Scan() {
+		return strings.TrimSpace(scanner.Text())
+	}
+	return ""
 }
