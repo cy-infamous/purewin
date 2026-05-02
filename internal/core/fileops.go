@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"time"
 
@@ -96,18 +97,22 @@ func SafeDelete(path string, dryRun bool) (int64, error) {
 			return size, nil
 		}
 
-		// If it's a retryable error, try again.
 		if isRetryableError(lastErr) {
 			continue
 		}
 
-		// For access denied, try removing read-only attribute and retry.
-		if isAccessDenied(lastErr) && !info.IsDir() {
-			_ = os.Chmod(path, 0o666)
+		if isAccessDenied(lastErr) {
+			if attempt == 0 {
+				_ = exec.Command("attrib", "-R", "-S", "-H", path+`\*.*`+"/S", "/D").Run()
+				_ = exec.Command("attrib", "-R", "-S", "-H", path).Run()
+			}
+			if attempt == 1 {
+				_ = exec.Command("takeown", "/F", path, "/R", "/D", "Y").Run()
+				_ = exec.Command("icacls", path, "/grant", "administrators:F", "/T", "/C").Run()
+			}
 			continue
 		}
 
-		// Non-retryable error: bail out.
 		break
 	}
 
