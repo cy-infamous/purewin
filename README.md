@@ -1,14 +1,10 @@
-<p align="center">
-  <img src="assets/logo.svg" alt="PureWin" width="96" height="96" />
-</p>
-
 <h1 align="center">PureWin</h1>
 
-<p align="center"><strong>Your system, purified.</strong></p>
+<p align="center"><strong>Your system, purified — on Windows and Linux.</strong></p>
 
 <p align="center">
-  <a href="https://github.com/lakshaymaurya-felt/purewin/actions/workflows/ci.yml"><img src="https://github.com/lakshaymaurya-felt/purewin/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
-  <a href="https://github.com/lakshaymaurya-felt/purewin"><img src="https://img.shields.io/github/go-mod/go-version/lakshaymaurya-felt/purewin" alt="Go Version" /></a>
+  <a href="https://github.com/cy-infamous/purewin/actions/workflows/ci.yml"><img src="https://github.com/cy-infamous/purewin/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+  <a href="https://github.com/cy-infamous/purewin"><img src="https://img.shields.io/github/go-mod/go-version/cy-infamous/purewin" alt="Go Version" /></a>
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT" /></a>
 </p>
 
@@ -16,7 +12,7 @@
 
 ## What is PureWin?
 
-**PureWin** is a system optimization toolkit built in pure Go. It delivers blazing-fast system cleanup, surgical app removal, real-time monitoring, and performance optimization in a single, dependency-free binary.
+**PureWin** is a cross-platform system optimization toolkit built in pure Go. It delivers blazing-fast system cleanup, surgical app removal, real-time monitoring, and performance optimization in a single, dependency-free binary.
 
 It runs on **Windows** and **Linux** with platform-appropriate behavior for each:
 
@@ -28,7 +24,7 @@ It runs on **Windows** and **Linux** with platform-appropriate behavior for each
 | Service management | Restart DNS, DHCP, Windows Search, Windows Update | Restart NetworkManager, systemd-resolved |
 | Optimization | DISM cleanup, SFC scan, icon cache rebuild, search index rebuild | Package cache cleanup, SSD TRIM, icon cache rebuild, journal vacuum, kernel cleanup |
 | Startup items | Registry startup programs | Enabled systemd services |
-| App uninstall | Registry cleanup, leftover file removal | — |
+| App uninstall | Registry cleanup, leftover file removal | Package manager removal (dnf/yum/apt/pacman) |
 | Installer cleanup | Orphaned `.exe`, `.msi`, `.msix` | — |
 | System monitoring | CPU, memory, disk, network, GPU, battery | CPU, memory, disk, network |
 | Disk analyzer | Interactive treemap | Interactive treemap |
@@ -99,11 +95,11 @@ go install github.com/lakshaymaurya-felt/purewin@latest
 
 ### Via PowerShell (Windows — one-liner)
 ```powershell
-irm https://raw.githubusercontent.com/lakshaymaurya-felt/purewin/main/scripts/install.ps1 | iex
+irm https://raw.githubusercontent.com/cy-infamous/purewin/main/scripts/install.ps1 | iex
 ```
 
 ### Via GitHub Releases
-Download the latest release for your platform from [Releases](https://github.com/lakshaymaurya-felt/purewin/releases):
+Download the latest release for your platform from [Releases](https://github.com/cy-infamous/purewin/releases):
 
 | Platform | File |
 |----------|------|
@@ -138,8 +134,9 @@ pw clean --all
 # Clean only browser caches
 pw clean --browser
 
-# Uninstall an app completely (Windows)
-pw uninstall
+# Uninstall an app completely
+pw uninstall                  # Interactive list
+pw uninstall --search chrome  # Find by name
 
 # Analyze disk usage with visual treemap
 pw analyze C:\          # Windows
@@ -180,7 +177,7 @@ pw version
 | Command | Description | Admin Required |
 |---------|-------------|----------------|
 | `clean` | Deep cleanup of caches, logs, temp files, browser leftovers | Partial* |
-| `uninstall` | Remove apps completely with registry and leftover cleanup (Windows) | Yes |
+| `uninstall` | Remove apps completely (Windows: registry cleanup, Linux: package manager) | Yes |
 | `analyze` | Interactive disk space analyzer with visual tree view | No |
 | `optimize` | Refresh caches, restart services, optimize performance | Yes |
 | `optimize --startup` | List enabled startup programs / services | No |
@@ -221,6 +218,16 @@ pw version
 | User caches | `~/.cache`, `~/.local/share/Trash`, `~/.thumbnails` |
 | Dev tools | `node_modules`, `target/`, `.gradle`, Go module cache, `~/.cargo/registry` |
 | Browser data | Chrome, Firefox, Chromium cache directories |
+
+### Linux Uninstall (`pw uninstall`)
+
+Lists installed packages from your system package manager (dnf/yum, apt, pacman, or zypper) and removes them.
+
+```bash
+pw uninstall --dry-run              # Preview what would be removed
+pw uninstall --search firefox       # Find and remove by name
+pw uninstall --show-all             # Include system packages
+```
 
 ---
 
@@ -279,7 +286,7 @@ Every destructive operation requires explicit user confirmation with detailed pr
 ## Building from Source
 
 ```bash
-git clone https://github.com/lakshaymaurya-felt/purewin.git
+git clone https://github.com/cy-infamous/purewin.git
 cd purewin
 
 # Build for current platform
@@ -291,7 +298,7 @@ GOOS=windows GOARCH=amd64 go build -o pw.exe .
 
 ### Build with Version Info
 ```bash
-go build -ldflags="-X github.com/lakshaymaurya-felt/purewin/cmd.appVersion=1.0.0" -o pw .
+go build -ldflags="-X github.com/cy-infamous/purewin/cmd.appVersion=1.0.0" -o pw .
 ```
 
 ---
