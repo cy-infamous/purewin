@@ -88,17 +88,75 @@ Native. Fast. Cross-platform. This is system optimization done right.
 
 ## Quick Install
 
-### Via Go Install
+### Linux (one-liner)
+
 ```bash
-go install github.com/lakshaymaurya-felt/purewin@latest
+curl -fsSL https://raw.githubusercontent.com/cy-infamous/purewin/main/scripts/install.sh | sudo bash
 ```
 
-### Via PowerShell (Windows — one-liner)
+Or manually:
+
+```bash
+# Download the latest binary
+sudo curl -fsSL -o /usr/local/bin/pw https://github.com/cy-infamous/purewin/releases/latest/download/pw-linux-amd64
+sudo chmod +x /usr/local/bin/pw
+
+# Verify
+pw version
+```
+
+<details>
+<summary>Install via package managers</summary>
+
+**Arch Linux (AUR):**
+```bash
+yay -S purewin
+```
+
+**Install from source (requires Go 1.24+):**
+```bash
+git clone https://github.com/cy-infamous/purewin.git
+cd purewin
+go build -o pw .
+sudo mv pw /usr/local/bin/
+```
+</details>
+
+### Windows (PowerShell — one-liner)
+
 ```powershell
 irm https://raw.githubusercontent.com/cy-infamous/purewin/main/scripts/install.ps1 | iex
 ```
 
+Or manually with **winget**:
+
+```powershell
+winget install cy-infamous.purewin
+```
+
+Or with **scoop**:
+
+```powershell
+scoop install purewin
+```
+
+Or from source (requires Go 1.24+):
+
+```powershell
+git clone https://github.com/cy-infamous/purewin.git
+cd purewin
+go build -o pw.exe .
+# Move pw.exe to a directory in your PATH
+```
+
+### Via Go Install (any platform)
+
+```bash
+go install github.com/cy-infamous/purewin@latest
+```
+
 ### Via GitHub Releases
+
 Download the latest release for your platform from [Releases](https://github.com/cy-infamous/purewin/releases):
 
 | Platform | File |
