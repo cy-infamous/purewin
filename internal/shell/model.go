@@ -2,6 +2,7 @@ package shell
 
 import (
 	"os"
+	"os/exec"
 	"strings"
 	"unicode/utf8"
 
@@ -44,7 +45,8 @@ type ShellModel struct {
 	IsAdmin   bool
 	Version   string
 	Hostname  string
-	scrollPos int // viewport scroll offset (0 = bottom)
+	GPUInfo   string
+	scrollPos int
 }
 
 // NewShellModel creates a fresh shell model.
@@ -58,6 +60,7 @@ func NewShellModel(version string) ShellModel {
 	cmds := AllCommands()
 
 	hostname, _ := os.Hostname()
+	gpuInfo := detectGPUInfo()
 
 	return ShellModel{
 		textInput:   ti,
@@ -68,6 +71,7 @@ func NewShellModel(version string) ShellModel {
 		IsAdmin:     core.IsElevated(),
 		Version:     version,
 		Hostname:    hostname,
+		GPUInfo:     gpuInfo,
 	}
 }
 
@@ -403,4 +407,60 @@ func padRight(s string, width int) string {
 		return s
 	}
 	return s + strings.Repeat(" ", width-runeCount)
+}
+
+func detectGPUInfo() string {
+	if path, err := exec.LookPath("nvidia-smi"); err == nil {
+		out, err := exec.Command(path,
+			"--query-gpu=name,memory.total,memory.used,utilization.gpu,temperature.gpu",
+			"--format=csv,noheader,nounits",
+		).Output()
+		if err == nil {
+			fields := strings.Split(strings.TrimSpace(string(out)), ",")
+			if len(fields) >= 4 {
+				return strings.TrimSpace(string(out))
+			}
+		}
+		_ = path
+	}
+
+	if path, err := exec.LookPath("lspci"); err == nil {
+		out, err := exec.Command(path).Output()
+		if err == nil {
+			for _, line := range strings.Split(string(out), "\n") {
+				lower := strings.ToLower(line)
+				if !strings.Contains(lower, "vga") && !strings.Contains(lower, "3d") {
+					continue
+				}
+				if idx := strings.Index(line, ": "); idx >= 0 {
+					return strings.TrimSpace(line[idx+2:])
+				}
+			}
+		}
+	}
+
+	entries, err := os.ReadDir("/sys/class/drm")
+	if err == nil {
+		for _, entry := range entries {
+			name := entry.Name()
+			if !strings.HasPrefix(name, "card") || strings.Contains(name, "-") {
+				continue
+			}
+			data, err := os.ReadFile("/sys/class/drm/" + name + "/device/vendor")
+			if err != nil {
+				continue
+			}
+			vendor := strings.TrimSpace(string(data))
+			switch {
+			case strings.Contains(vendor, "10de"):
+				return "NVIDIA GPU"
+			case strings.Contains(vendor, "1002"):
+				return "AMD GPU"
+			case strings.Contains(vendor, "8086"):
+				return "Intel GPU"
+			}
+		}
+	}
+
+	return ""
 }
