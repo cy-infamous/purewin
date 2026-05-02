@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/lakshaymaurya-felt/purewin/internal/config"
 	"github.com/lakshaymaurya-felt/purewin/internal/ui"
@@ -113,10 +114,16 @@ func runUpdate(cmd *cobra.Command, args []string) {
 	// Verify the new binary exists
 	exePath, err := os.Executable()
 	if err != nil {
-		spinner.Stop("Update installed (could not verify binary path)")
+		spinner.Stop("Update installed")
 	} else {
 		exePath, _ = filepath.EvalSymlinks(exePath)
-		if _, err := os.Stat(exePath); err != nil {
+		// On Linux the running binary may have been renamed to .old,
+		// so check for the original path (without .old suffix).
+		checkPath := exePath
+		if strings.HasSuffix(checkPath, ".old") {
+			checkPath = strings.TrimSuffix(checkPath, ".old")
+		}
+		if _, err := os.Stat(checkPath); err != nil {
 			spinner.StopWithError("Failed to verify new binary")
 			os.Exit(1)
 		}

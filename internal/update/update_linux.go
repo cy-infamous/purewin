@@ -141,8 +141,6 @@ func ApplyUpdate(tempPath string) error {
 		return fmt.Errorf("failed to copy new executable: %w", err)
 	}
 
-	_ = os.Remove(oldPath)
-
 	return nil
 }
 
@@ -162,7 +160,6 @@ func applyUpdateWithSudo(tempPath, currentExePath, oldPath string) error {
 	}
 
 	_ = exec.Command(sudo, "chmod", "+x", currentExePath).Run()
-	_ = exec.Command(sudo, "rm", "-f", oldPath).Run()
 
 	return nil
 }
