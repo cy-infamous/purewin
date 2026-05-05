@@ -216,7 +216,7 @@ func (m ShellModel) renderBannerCompact(_ int, availH int) string {
 	}
 
 	title := bannerName.Render("PureWin") + "  " + welcomeVersionBadge.Render(m.Version)
-	desc := bannerDesc.Render("Deep clean and optimize your Windows.")
+	desc := bannerDesc.Render("Deep clean and optimize your system.")
 	hint := lipgloss.NewStyle().Foreground(dim).Italic(true).
 		Render("Type / for commands " + ui.IconBullet + " /help for details")
 

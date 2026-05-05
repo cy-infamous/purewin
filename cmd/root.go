@@ -38,8 +38,8 @@ func SetVersionInfo(version, commit, date string) {
 
 var rootCmd = &cobra.Command{
 	Use:   "pw",
-	Short: "Deep clean and optimize your Windows",
-	Long: `PureWin - Deep clean and optimize your Windows.
+	Short: "Deep clean and optimize your system",
+	Long: `PureWin - Deep clean and optimize your system.
 
 All-in-one toolkit for system cleanup, app uninstallation,
 disk analysis, system optimization, and live monitoring.`,
@@ -218,7 +218,7 @@ func runInteractiveMenu() {
 func runSimpleShell() {
 	fmt.Println()
 	fmt.Printf("PureWin %s\n", appVersion)
-	fmt.Println("Deep clean and optimize your Windows.")
+	fmt.Println("Deep clean and optimize your system.")
 	fmt.Println("Type /help for commands, /quit to exit.")
 	fmt.Println()
 
@@ -277,7 +277,7 @@ func printSimpleHelp() {
 	fmt.Println()
 	fmt.Println("    /clean        Deep clean system caches and temp files")
 	fmt.Println("    /uninstall    Remove installed applications")
-	fmt.Println("    /optimize     Speed up Windows with service tuning")
+	fmt.Println("    /optimize     Optimize system performance")
 	fmt.Println("    /analyze      Explore disk space usage")
 	fmt.Println("    /status       Live system health monitor")
 	fmt.Println("    /purge        Clean project build artifacts")
