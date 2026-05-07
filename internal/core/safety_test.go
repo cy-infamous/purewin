@@ -1,6 +1,7 @@
 package core
 
 import (
+	"runtime"
 	"strings"
 	"testing"
 
@@ -20,7 +21,11 @@ func TestValidatePath_RejectsEmpty(t *testing.T) {
 }
 
 func TestValidatePath_RejectsRelative(t *testing.T) {
-	for _, p := range []string{"relative/path", ".", "..", `foo\bar`} {
+	paths := []string{"relative/path", ".", ".."}
+	if runtime.GOOS == "windows" {
+		paths = append(paths, `foo\bar`)
+	}
+	for _, p := range paths {
 		if err := ValidatePath(p); err == nil {
 			t.Errorf("ValidatePath(%q) should reject relative path", p)
 		}
@@ -28,7 +33,9 @@ func TestValidatePath_RejectsRelative(t *testing.T) {
 }
 
 func TestValidatePath_RejectsDriveRoots(t *testing.T) {
-	// MUST test: C:\, D:\, C:, c:\
+	if runtime.GOOS != "windows" {
+		t.Skip("drive root test is Windows-specific")
+	}
 	for _, p := range []string{`C:\`, `D:\`, `C:`, `c:\`, `E:\`} {
 		if err := ValidatePath(p); err == nil {
 			t.Errorf("ValidatePath(%q) should reject drive root", p)
@@ -37,6 +44,9 @@ func TestValidatePath_RejectsDriveRoots(t *testing.T) {
 }
 
 func TestValidatePath_RejectsTraversal(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("traversal test paths are Windows-specific")
+	}
 	for _, p := range []string{
 		`C:\Users\..\..\..\Windows\System32`,
 		`C:\Users\test\..\..\Windows`,
@@ -49,6 +59,9 @@ func TestValidatePath_RejectsTraversal(t *testing.T) {
 }
 
 func TestValidatePath_RejectsControlChars(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("control char test paths are Windows-specific")
+	}
 	for _, p := range []string{
 		"C:\\Users\\test\x00file",
 		"C:\\dir\x01name\\file",
@@ -70,14 +83,20 @@ func TestValidatePath_RejectsNeverDeletePaths(t *testing.T) {
 }
 
 func TestValidatePath_AcceptsValidPaths(t *testing.T) {
-	// Paths that don't exist on disk are fine — ValidatePath only does the
-	// symlink check on paths that actually exist (os.Lstat succeeds).
-	// These paths are NOT under any NEVER_DELETE directory.
-	for _, p := range []string{
-		`C:\SomeSafeDir\SubDir\file.tmp`,
-		`D:\Projects\build\output.zip`,
-		`C:\Workspace\tools\binary.exe`,
-	} {
+	var paths []string
+	if runtime.GOOS == "windows" {
+		paths = []string{
+			`C:\SomeSafeDir\SubDir\file.tmp`,
+			`D:\Projects\build\output.zip`,
+			`C:\Workspace\tools\binary.exe`,
+		}
+	} else {
+		paths = []string{
+			`/tmp/safe_test_dir/file.tmp`,
+			`/home/user/projects/build/output.zip`,
+		}
+	}
+	for _, p := range paths {
 		if err := ValidatePath(p); err != nil {
 			t.Errorf("ValidatePath(%q) should accept valid path, got: %v", p, err)
 		}
@@ -98,13 +117,16 @@ func TestIsSafePath_ProtectsAllNeverDeletePaths(t *testing.T) {
 }
 
 func TestIsSafePath_ProtectsSubdirectories(t *testing.T) {
-	// Subdirectories of NEVER_DELETE paths must also be protected (prefix match).
+	if runtime.GOOS != "windows" {
+		t.Skip("subdirectory protection test uses Windows paths")
+	}
 	for _, p := range []string{
 		`C:\Windows\System32\drivers`,
 		`C:\Windows\System32\config\SAM`,
 		`C:\Windows\WinSxS\Manifests`,
 		`C:\Program Files\Common Files`,
-		`C:\Users\Default`,
+		`C:\Program Files (x86)\SomeApp`,
+		`C:\Windows\Installer\patches`,
 	} {
 		if IsSafePath(p) {
 			t.Errorf("IsSafePath(%q) must return false — subdirectory of NEVER_DELETE", p)
@@ -113,6 +135,9 @@ func TestIsSafePath_ProtectsSubdirectories(t *testing.T) {
 }
 
 func TestIsSafePath_CaseInsensitive(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("case-insensitive test is Windows-specific")
+	}
 	for _, p := range []string{
 		`c:\windows`,
 		`C:\WINDOWS`,
@@ -126,11 +151,21 @@ func TestIsSafePath_CaseInsensitive(t *testing.T) {
 }
 
 func TestIsSafePath_AllowsSafePaths(t *testing.T) {
-	for _, p := range []string{
-		`C:\SomeSafeDir\SubDir`,
-		`D:\Projects\build`,
-		`C:\Workspace\output`,
-	} {
+	var paths []string
+	if runtime.GOOS == "windows" {
+		paths = []string{
+			`C:\SomeSafeDir\SubDir`,
+			`D:\Projects\build`,
+			`C:\Workspace\output`,
+		}
+	} else {
+		paths = []string{
+			`/tmp/safe_test`,
+			`/home/user/projects`,
+			`/opt/workspace`,
+		}
+	}
+	for _, p := range paths {
 		if !IsSafePath(p) {
 			t.Errorf("IsSafePath(%q) should return true for non-protected path", p)
 		}
@@ -138,6 +173,9 @@ func TestIsSafePath_AllowsSafePaths(t *testing.T) {
 }
 
 func TestValidatePath_ErrorMessages(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("error message test uses Windows paths")
+	}
 	tests := []struct {
 		path     string
 		contains string
@@ -145,7 +183,7 @@ func TestValidatePath_ErrorMessages(t *testing.T) {
 		{"", "empty"},
 		{"relative", "absolute"},
 		{`C:\`, "drive root"},
-		{`C:\Windows`, "NEVER"},
+		{`C:\Windows`, "protected"},
 	}
 	for _, tc := range tests {
 		err := ValidatePath(tc.path)

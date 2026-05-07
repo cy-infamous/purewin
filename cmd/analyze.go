@@ -34,11 +34,16 @@ func runAnalyze(cmd *cobra.Command, args []string) error {
 		target = args[0]
 	}
 	if target == "" {
-		home, err := os.UserHomeDir()
+		cwd, err := os.Getwd()
 		if err != nil {
-			return fmt.Errorf("cannot determine home directory: %w", err)
+			home, homeErr := os.UserHomeDir()
+			if homeErr != nil {
+				return fmt.Errorf("cannot determine working or home directory: %w", err)
+			}
+			target = home
+		} else {
+			target = cwd
 		}
-		target = home
 	}
 
 	// Validate the path exists.
@@ -46,8 +51,13 @@ func runAnalyze(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("cannot access %s: %w", target, err)
 	}
 
-	// Parse exclude list.
+	// Parse exclude list — add sensible defaults if none specified.
 	exclude, _ := cmd.Flags().GetStringSlice("exclude")
+	exclude = append(exclude,
+		".git", ".svn", ".hg",
+		"node_modules", ".venv", "__pycache__",
+		".cache", ".npm", ".cargo",
+	)
 
 	// Parse depth and min-size flags.
 	depth, _ := cmd.Flags().GetInt("depth")

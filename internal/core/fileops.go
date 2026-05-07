@@ -47,28 +47,25 @@ func isAccessDenied(err error) bool {
 // SafeDelete removes a file or directory after safety validation.
 // In dryRun mode, it calculates and returns the size without deleting.
 // It retries up to 3 times with exponential backoff for locked files.
+// As a last resort, schedules the file for deletion on next reboot.
 // Returns the number of bytes freed (or that would be freed).
 func SafeDelete(path string, dryRun bool) (int64, error) {
-	// Validate path through safety checks.
 	if err := ValidatePath(path); err != nil {
 		return 0, fmt.Errorf("safety check failed for %s: %w", path, err)
 	}
 
-	// Check if path exists.
 	info, err := os.Lstat(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return 0, nil // Nothing to delete.
+			return 0, nil
 		}
 		return 0, fmt.Errorf("cannot stat %s: %w", path, err)
 	}
 
-	// Calculate size.
 	var size int64
 	if info.IsDir() {
 		size, err = GetDirSize(path)
 		if err != nil {
-			// Non-fatal: we can still attempt deletion.
 			size = 0
 		}
 	} else {
@@ -79,7 +76,6 @@ func SafeDelete(path string, dryRun bool) (int64, error) {
 		return size, nil
 	}
 
-	// Attempt deletion with retry.
 	var lastErr error
 	for attempt := 0; attempt < maxRetries; attempt++ {
 		if attempt > 0 {
@@ -116,7 +112,29 @@ func SafeDelete(path string, dryRun bool) (int64, error) {
 		break
 	}
 
+	if lastErr != nil && scheduleDeleteOnReboot(path) == nil {
+		return size, nil
+	}
+
 	return 0, fmt.Errorf("failed to delete %s after %d attempts: %w", path, maxRetries, lastErr)
+}
+
+// scheduleDeleteOnReboot uses MoveFileExW with MOVEFILE_DELAY_UNTIL_REBOOT
+// to schedule a file or directory for deletion on the next system reboot.
+// This handles files locked by running processes that cannot be deleted now.
+func scheduleDeleteOnReboot(path string) error {
+	pathPtr, err := windows.UTF16PtrFromString(path)
+	if err != nil {
+		return fmt.Errorf("invalid path for MoveFileEx: %w", err)
+	}
+
+	const MOVEFILE_DELAY_UNTIL_REBOOT = 0x00000004
+
+	err = windows.MoveFileEx(pathPtr, nil, MOVEFILE_DELAY_UNTIL_REBOOT)
+	if err != nil {
+		return fmt.Errorf("MoveFileEx DELAY_UNTIL_REBOOT failed for %s: %w", path, err)
+	}
+	return nil
 }
 
 // SafeDeleteWithWhitelist removes a file or directory after checking

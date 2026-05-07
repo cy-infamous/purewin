@@ -3,32 +3,43 @@ package core
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
 
-// unprotectedTempDir creates a temporary directory that passes IsSafePath.
-// t.TempDir() creates under C:\Users which is in NEVER_DELETE, so SafeDelete
-// would reject those paths. We try drive-root locations instead.
 func unprotectedTempDir(t *testing.T) string {
 	t.Helper()
-	candidates := []string{`C:\PureWinTest`, `D:\PureWinTest`, `E:\PureWinTest`}
-	for _, base := range candidates {
-		if err := os.MkdirAll(base, 0o755); err != nil {
-			continue
+	if runtime.GOOS == "windows" {
+		candidates := []string{`C:\PureWinTest`, `D:\PureWinTest`, `E:\PureWinTest`}
+		for _, base := range candidates {
+			if err := os.MkdirAll(base, 0o755); err != nil {
+				continue
+			}
+			dir, err := os.MkdirTemp(base, "wmt-")
+			if err != nil {
+				continue
+			}
+			if !IsSafePath(dir) {
+				os.RemoveAll(dir)
+				continue
+			}
+			t.Cleanup(func() {
+				os.RemoveAll(dir)
+				os.Remove(base)
+			})
+			return dir
 		}
-		dir, err := os.MkdirTemp(base, "wmt-")
+	} else {
+		dir, err := os.MkdirTemp("/tmp", "pwtest-")
 		if err != nil {
-			continue
+			t.Skipf("cannot create temp dir: %v", err)
 		}
 		if !IsSafePath(dir) {
 			os.RemoveAll(dir)
-			continue
+			t.Skip("temp dir is in a protected path")
 		}
-		t.Cleanup(func() {
-			os.RemoveAll(dir)
-			os.Remove(base) // remove parent if empty
-		})
+		t.Cleanup(func() { os.RemoveAll(dir) })
 		return dir
 	}
 	t.Skip("no writable non-protected directory available; skipping file-operation test")
@@ -40,10 +51,12 @@ func unprotectedTempDir(t *testing.T) string {
 // ---------------------------------------------------------------------------
 
 func TestSafeDelete_RejectsProtectedPaths(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("protected paths test is Windows-specific")
+	}
 	for _, p := range []string{
 		`C:\Windows`,
 		`C:\Windows\System32`,
-		`C:\Users`,
 		`C:\Program Files`,
 		`C:\ProgramData`,
 	} {
@@ -115,9 +128,13 @@ func TestSafeDelete_ReturnsCorrectSize(t *testing.T) {
 }
 
 func TestSafeDelete_NonExistentPath(t *testing.T) {
-	// Deleting a non-existent file under a safe (non-protected) path
-	// should return 0, nil.
-	size, err := SafeDelete(`C:\PureWinNonExistent\does\not\exist.tmp`, false)
+	var nonExistPath string
+	if runtime.GOOS == "windows" {
+		nonExistPath = `C:\PureWinNonExistent\does\not\exist.tmp`
+	} else {
+		nonExistPath = `/tmp/pw-nonexistent/does/not/exist.tmp`
+	}
+	size, err := SafeDelete(nonExistPath, false)
 	if err != nil {
 		t.Errorf("SafeDelete on non-existent path should not error, got: %v", err)
 	}

@@ -3,6 +3,8 @@ wm.exe
 winmole.exe
 *.exe
 !scripts/*.ps1
+pw
+/pw
 
 # Go build
 /dist/

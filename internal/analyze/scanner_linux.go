@@ -146,12 +146,6 @@ func (s *Scanner) scanDir(entry *DirEntry) {
 
 		name := e.Name()
 
-		// Skip hidden files/directories (dot-prefix on Linux).
-		if strings.HasPrefix(name, ".") {
-			continue
-		}
-
-		// Skip excluded directories.
 		if e.IsDir() && s.exclude[strings.ToLower(name)] {
 			continue
 		}

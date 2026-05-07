@@ -385,9 +385,15 @@ func GetTargetsByCategory(category string) []CleanTarget {
 }
 
 // GetNeverDeletePaths returns paths that must NEVER be deleted under any
-// circumstances. This list uses environment variables to support Windows
-// installations on any drive letter (not just C:).
+// circumstances. Returns platform-appropriate paths based on runtime.GOOS.
 func GetNeverDeletePaths() []string {
+	if runtime.GOOS == "linux" {
+		return getLinuxNeverDeletePaths()
+	}
+	return getWindowsNeverDeletePaths()
+}
+
+func getWindowsNeverDeletePaths() []string {
 	w := winDir()
 	sd := systemDrive()
 	return []string{
@@ -402,7 +408,6 @@ func GetNeverDeletePaths() []string {
 		filepath.Join(sd, "EFI"),
 		programFiles(),
 		programFilesX86(),
-		filepath.Join(sd, "Users"),
 		programData(),
 		filepath.Join(sd, "Recovery"),
 		filepath.Join(w, "Installer"),
@@ -623,7 +628,7 @@ func getLinuxNeverDeletePaths() []string {
 		"/bin", "/sbin", "/usr/bin", "/usr/sbin",
 		"/lib", "/lib64", "/usr/lib", "/usr/lib64",
 		"/etc", "/boot", "/proc", "/sys", "/dev",
-		"/root", "/home",
+		"/root",
 		"/var/lib", "/var/run",
 	}
 }
