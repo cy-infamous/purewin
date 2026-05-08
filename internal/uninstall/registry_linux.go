@@ -6,6 +6,7 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"os"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -218,6 +219,11 @@ func UninstallApp(app InstalledApp, quiet bool) error {
 	}
 
 	cmd := exec.Command(parts[0], parts[1:]...)
+	if app.InstallLocation != "" {
+		if info, err := os.Stat(app.InstallLocation); err == nil && info.IsDir() {
+			cmd.Dir = app.InstallLocation
+		}
+	}
 	cmd.Stdout = nil
 	cmd.Stderr = nil
 	return cmd.Run()

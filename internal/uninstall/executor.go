@@ -57,7 +57,7 @@ func UninstallApp(app InstalledApp, quiet bool) error {
 	// Detect installer type and handle MSI specially.
 	installerType := detectInstallerType(cmdStr)
 	if installerType == InstallerMSI {
-		return runMSIUninstall(cmdStr, quiet)
+		return runMSIUninstall(cmdStr, quiet, app.InstallLocation)
 	}
 
 	// Edge requires registry preparation before uninstall can proceed.
@@ -65,10 +65,7 @@ func UninstallApp(app InstalledApp, quiet bool) error {
 		if err := prepareEdgeUninstall(); err != nil {
 			return fmt.Errorf("failed to prepare Edge uninstall: %w", err)
 		}
-		// Run the uninstall. On failure: clean up stub AND restart Edge services
-		// so Edge isn't left in a broken state. On success: stub MUST remain to
-		// prevent Windows from re-provisioning Edge on future updates.
-		uninstallErr := runUninstallCommand(cmdStr, installerType, quiet)
+		uninstallErr := runUninstallCommandWithDir(cmdStr, installerType, quiet, app.InstallLocation)
 		if uninstallErr != nil {
 			cleanupEdgeStub()
 			restartEdgeServices()
@@ -77,7 +74,7 @@ func UninstallApp(app InstalledApp, quiet bool) error {
 	}
 
 	// For non-MSI installers, parse the command and apply silent flags if needed.
-	return runUninstallCommand(cmdStr, installerType, quiet)
+	return runUninstallCommandWithDir(cmdStr, installerType, quiet, app.InstallLocation)
 }
 
 // ─── Internal Helpers ────────────────────────────────────────────────────────
@@ -266,12 +263,10 @@ func chooseUninstallCommand(app InstalledApp, quiet bool) string {
 }
 
 // runMSIUninstall extracts the GUID and runs msiexec with proper flags.
-func runMSIUninstall(cmdStr string, quiet bool) error {
+func runMSIUninstall(cmdStr string, quiet bool, workDir string) error {
 	guid := msiGUIDPattern.FindString(cmdStr)
 	if guid == "" {
-		// Fallback to running the raw command if we can't parse the GUID.
-		// Treat it as generic EXE for the fallback.
-		return runUninstallCommand(cmdStr, InstallerGenericEXE, quiet)
+		return runUninstallCommandWithDir(cmdStr, InstallerGenericEXE, quiet, workDir)
 	}
 
 	args := []string{"/x", guid}
@@ -283,6 +278,9 @@ func runMSIUninstall(cmdStr string, quiet bool) error {
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, "msiexec.exe", args...)
+	if workDir != "" {
+		cmd.Dir = workDir
+	}
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return handleExitError(err, output)
@@ -400,20 +398,27 @@ func cleanupEdgeStub() {
 // This is the CRITICAL FIX for the Logseq bug: we parse the command string properly
 // instead of passing it raw to cmd.exe, which allows quoted paths with spaces to work.
 func runUninstallCommand(cmdStr string, installerType InstallerType, quiet bool) error {
-	// Parse the uninstall string into executable and arguments.
+	return runUninstallCommandWithDir(cmdStr, installerType, quiet, "")
+}
+
+// runUninstallCommandWithDir runs an uninstall command with an optional working directory.
+// If workDir is non-empty, the uninstall process starts in that directory — critical for
+// installers (NSIS, InnoSetup, Squirrel) that resolve relative paths from CWD.
+func runUninstallCommandWithDir(cmdStr string, installerType InstallerType, quiet bool, workDir string) error {
 	exe, args := parseUninstallString(cmdStr)
 	if exe == "" {
 		return fmt.Errorf("unable to parse uninstall command: %q", cmdStr)
 	}
 
-	// Apply installer-specific silent flags if quiet mode is enabled.
 	args = applySilentFlags(args, installerType, quiet)
 
 	ctx, cancel := context.WithTimeout(context.Background(), uninstallTimeout)
 	defer cancel()
 
-	// Execute the command directly (NOT via cmd.exe /C).
 	cmd := exec.CommandContext(ctx, exe, args...)
+	if workDir != "" {
+		cmd.Dir = workDir
+	}
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return handleExitError(err, output)
