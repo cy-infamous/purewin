@@ -68,13 +68,21 @@ func ScanProjects(paths []string) ([]ProjectArtifact, error) {
 	var artifacts []ProjectArtifact
 	seenProjects := make(map[string]bool)
 
+	// Build a set of paths that must NEVER be treated as project artifacts.
+	// $HOME/.cache is the XDG cache home — not a project artifact.
+	protectedPaths := make(map[string]bool)
+	if home := os.Getenv("HOME"); home != "" {
+		protectedPaths[filepath.Join(home, ".cache")] = true
+		protectedPaths[home] = true // The home directory itself is never an artifact
+	}
+
 	for _, basePath := range paths {
 		basePath = os.ExpandEnv(basePath)
 		if _, err := os.Stat(basePath); os.IsNotExist(err) {
 			continue // Skip non-existent paths
 		}
 
-		err := scanDirectory(basePath, basePath, 0, 3, seenProjects, &artifacts)
+		err := scanDirectory(basePath, basePath, 0, 3, seenProjects, protectedPaths, &artifacts)
 		if err != nil {
 			// Non-fatal: log but continue scanning other paths
 			continue
@@ -105,7 +113,8 @@ func isSymlink(path string) bool {
 // scanDirectory recursively scans a directory for project artifacts.
 // depth starts at 0 and increases with each level.
 // maxDepth limits how deep we search (typically 3).
-func scanDirectory(basePath, currentPath string, depth, maxDepth int, seenProjects map[string]bool, artifacts *[]ProjectArtifact) error {
+// protectedPaths are absolute paths that must never be treated as artifacts.
+func scanDirectory(basePath, currentPath string, depth, maxDepth int, seenProjects map[string]bool, protectedPaths map[string]bool, artifacts *[]ProjectArtifact) error {
 	if depth > maxDepth {
 		return nil
 	}
@@ -136,6 +145,12 @@ func scanDirectory(basePath, currentPath string, depth, maxDepth int, seenProjec
 		}
 
 		artifactPath := filepath.Join(currentPath, name)
+
+		// Never treat protected paths (e.g. $HOME/.cache) as project artifacts.
+		absArtifact, _ := filepath.Abs(artifactPath)
+		if protectedPaths[absArtifact] {
+			continue
+		}
 
 		// Find the matching definition
 		var def *artifactDefinition
@@ -216,7 +231,7 @@ func scanDirectory(basePath, currentPath string, depth, maxDepth int, seenProjec
 			continue
 		}
 
-		_ = scanDirectory(basePath, subPath, depth+1, maxDepth, seenProjects, artifacts)
+		_ = scanDirectory(basePath, subPath, depth+1, maxDepth, seenProjects, protectedPaths, artifacts)
 	}
 
 	return nil
