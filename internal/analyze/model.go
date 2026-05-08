@@ -234,6 +234,8 @@ func (m AnalyzeModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.err = msg.err
 		} else {
 			m.removeEntry(msg.path)
+			m.removeFromSearchResults(msg.path)
+			m.recalcBreadcrumbSizes(msg.freed)
 		}
 		return m, nil
 	}
@@ -304,20 +306,86 @@ func (m *AnalyzeModel) removeEntry(path string) {
 	if m.current == nil {
 		return
 	}
-	for i, c := range m.current.Children {
+
+	removed := m.removeChild(m.current, path)
+	if !removed {
+		m.removeChildRecursive(m.root, path)
+	}
+
+	var total int64
+	for _, child := range m.current.Children {
+		total += child.Size
+	}
+	m.current.Size = total
+
+	if m.cursor >= len(m.current.Children) && m.cursor > 0 {
+		m.cursor--
+	}
+}
+
+func (m *AnalyzeModel) removeChild(parent *DirEntry, path string) bool {
+	for i, c := range parent.Children {
 		if c.Path == path {
-			m.current.Children = append(m.current.Children[:i], m.current.Children[i+1:]...)
-			// Recalculate current directory size.
+			parent.Children = append(parent.Children[:i], parent.Children[i+1:]...)
 			var total int64
-			for _, child := range m.current.Children {
+			for _, child := range parent.Children {
 				total += child.Size
 			}
-			m.current.Size = total
-			if m.cursor >= len(m.current.Children) && m.cursor > 0 {
-				m.cursor--
+			parent.Size = total
+			return true
+		}
+	}
+	return false
+}
+
+func (m *AnalyzeModel) removeChildRecursive(entry *DirEntry, path string) bool {
+	for i, c := range entry.Children {
+		if c.Path == path {
+			entry.Children = append(entry.Children[:i], entry.Children[i+1:]...)
+			var total int64
+			for _, child := range entry.Children {
+				total += child.Size
+			}
+			entry.Size = total
+			return true
+		}
+		if c.IsDir && m.removeChildRecursive(c, path) {
+			var total int64
+			for _, child := range entry.Children {
+				total += child.Size
+			}
+			entry.Size = total
+			return true
+		}
+	}
+	return false
+}
+
+func (m *AnalyzeModel) removeFromSearchResults(path string) {
+	for i, r := range m.searchResults {
+		if r.Entry.Path == path {
+			m.searchResults = append(m.searchResults[:i], m.searchResults[i+1:]...)
+			if m.searchCursor >= len(m.searchResults) && m.searchCursor > 0 {
+				m.searchCursor--
 			}
 			return
 		}
+	}
+}
+
+func (m *AnalyzeModel) recalcBreadcrumbSizes(freed int64) {
+	if freed <= 0 {
+		return
+	}
+	for _, entry := range m.breadcrumb {
+		entry.Size -= freed
+		if entry.Size < 0 {
+			entry.Size = 0
+		}
+	}
+	m.root.Size -= freed
+	if m.root.Size < 0 {
+		m.root.Size = 0
 	}
 }
 
