@@ -4,80 +4,134 @@ package uninstall
 
 import (
 	"fmt"
-	"os/exec"
 
+	"github.com/cy-infamous/purewin/internal/core"
 	"github.com/cy-infamous/purewin/internal/ui"
 )
 
+// RunBatchUninstall presents a multi-select UI for the given applications,
+// confirms the selection, and executes uninstalls with progress feedback.
+// In dryRun mode, operations are listed but not executed.
 func RunBatchUninstall(apps []InstalledApp, dryRun bool) error {
 	if len(apps) == 0 {
 		fmt.Println(ui.MutedStyle().Render("  No applications found."))
 		return nil
 	}
 
-	fmt.Println()
-	fmt.Println(ui.BoldStyle().Render("  Installed applications:"))
-	fmt.Println()
-
-	max := len(apps)
-	if max > 30 {
-		max = 30
-	}
-
-	for i := 0; i < max; i++ {
-		app := apps[i]
-		sizeStr := ""
-		if app.EstimatedSize > 0 {
-			sizeStr = fmt.Sprintf(" (%s)", ui.FormatSize(app.EstimatedSize))
+	// 1. Convert to selector items.
+	items := make([]ui.SelectorItem, len(apps))
+	for i, app := range apps {
+		desc := app.Publisher
+		if app.Version != "" {
+			if desc != "" {
+				desc += " · "
+			}
+			desc += "v" + app.Version
 		}
-		num := ui.MutedStyle().Render(fmt.Sprintf("  %d.", i+1))
-		fmt.Printf("%s %s %s%s\n", num, app.Name, ui.MutedStyle().Render(app.Version), sizeStr)
+
+		items[i] = ui.SelectorItem{
+			Label:       app.Name,
+			Description: desc,
+			Size:        formatAppSizeLinux(app.EstimatedSize),
+		}
 	}
 
-	if len(apps) > 30 {
-		fmt.Printf("  %s... and %d more (use --search to filter)\n",
-			ui.MutedStyle().Render(""), len(apps)-30)
+	// 2. Run the selector.
+	selected, err := ui.RunSelector(items, "Select applications to uninstall")
+	if err != nil {
+		return fmt.Errorf("selector error: %w", err)
 	}
-
-	if dryRun {
-		fmt.Println()
-		fmt.Println(ui.MutedStyle().Render("  DRY RUN — no changes made."))
+	if len(selected) == 0 {
+		fmt.Println(ui.MutedStyle().Render("  No applications selected."))
 		return nil
 	}
 
-	confirmed, err := ui.Confirm("Remove all listed applications?")
-	if err != nil || !confirmed {
+	// 3. Map selected items back to apps.
+	selectedApps := mapSelectedAppsLinux(apps, selected)
+
+	// 4. Show what was selected.
+	fmt.Println()
+	fmt.Println(ui.HeaderStyle().Render(
+		fmt.Sprintf("  %d application(s) selected for removal:", len(selectedApps))))
+	for _, app := range selectedApps {
+		sizeStr := ""
+		if app.EstimatedSize > 0 {
+			sizeStr = " (" + core.FormatSize(app.EstimatedSize) + ")"
+		}
+		fmt.Printf("  %s %s%s\n", ui.IconBullet, app.Name, sizeStr)
+	}
+	fmt.Println()
+
+	// 5. Dry-run: report only.
+	if dryRun {
+		fmt.Println(ui.WarningStyle().Render(
+			"  DRY RUN — no applications will be uninstalled."))
+		return nil
+	}
+
+	// 6. Confirm before executing.
+	confirmed, err := ui.DangerConfirm("This will uninstall the selected applications")
+	if err != nil {
+		return fmt.Errorf("confirmation error: %w", err)
+	}
+	if !confirmed {
 		fmt.Println(ui.MutedStyle().Render("  Cancelled."))
 		return nil
 	}
 
-	pkgMgr := detectPkgManager()
-	var pkgNames []string
-	for _, app := range apps {
-		pkgNames = append(pkgNames, app.Name)
+	// 7. Execute uninstalls with progress.
+	fmt.Println()
+	var successes, failures int
+
+	for _, app := range selectedApps {
+		spin := ui.NewInlineSpinner()
+		spin.Start(fmt.Sprintf("Uninstalling %s...", app.Name))
+
+		uninstErr := UninstallApp(app, false)
+		if uninstErr != nil {
+			spin.StopWithError(fmt.Sprintf("Failed to uninstall %s: %s", app.Name, uninstErr))
+			failures++
+		} else {
+			spin.Stop(fmt.Sprintf("Uninstalled %s", app.Name))
+			successes++
+		}
 	}
 
-	spin := ui.NewInlineSpinner()
-	spin.Start(fmt.Sprintf("Removing %d package(s)...", len(pkgNames)))
-
-	var cmd *exec.Cmd
-	switch pkgMgr {
-	case "dnf", "yum":
-		cmd = exec.Command(pkgMgr, append([]string{"remove", "-y"}, pkgNames...)...)
-	case "apt":
-		cmd = exec.Command("apt", append([]string{"remove", "-y"}, pkgNames...)...)
-	case "pacman":
-		cmd = exec.Command("pacman", append([]string{"-R", "--noconfirm"}, pkgNames...)...)
-	default:
-		spin.StopWithError("No supported package manager")
-		return fmt.Errorf("no supported package manager")
+	// 8. Summary.
+	fmt.Println()
+	fmt.Println(ui.Divider(40))
+	if successes > 0 {
+		fmt.Println(ui.SuccessStyle().Render(
+			fmt.Sprintf("  %s %d application(s) uninstalled successfully", ui.IconSuccess, successes)))
+	}
+	if failures > 0 {
+		fmt.Println(ui.ErrorStyle().Render(
+			fmt.Sprintf("  %s %d application(s) failed to uninstall", ui.IconError, failures)))
 	}
 
-	if err := cmd.Run(); err != nil {
-		spin.StopWithError(fmt.Sprintf("Removal failed: %s", err))
-		return fmt.Errorf("removal failed: %w", err)
-	}
-
-	spin.Stop(fmt.Sprintf("Removed %d package(s)", len(pkgNames)))
 	return nil
+}
+
+// mapSelectedAppsLinux maps selected SelectorItems back to InstalledApp entries.
+func mapSelectedAppsLinux(apps []InstalledApp, selected []ui.SelectorItem) []InstalledApp {
+	selectedSet := make(map[string]bool)
+	for _, s := range selected {
+		selectedSet[s.Label] = true
+	}
+
+	var result []InstalledApp
+	for _, app := range apps {
+		if selectedSet[app.Name] {
+			result = append(result, app)
+		}
+	}
+	return result
+}
+
+// formatAppSizeLinux returns a human-readable size string for display.
+func formatAppSizeLinux(bytes int64) string {
+	if bytes <= 0 {
+		return ""
+	}
+	return core.FormatSize(bytes)
 }
