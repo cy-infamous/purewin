@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/lakshaymaurya-felt/purewin/internal/core"
+	"github.com/cy-infamous/purewin/internal/core"
 )
 
 // ProjectArtifact represents a build artifact found in a project directory.
@@ -267,7 +267,7 @@ func GetDefaultScanPaths() []string {
 		home = os.Getenv("USERPROFILE")
 	}
 
-	return []string{
+	paths := []string{
 		home,
 		filepath.Join(home, "Projects"),
 		filepath.Join(home, "GitHub"),
@@ -276,6 +276,14 @@ func GetDefaultScanPaths() []string {
 		filepath.Join(home, "workspace"),
 		filepath.Join(home, "Documents"),
 	}
+
+	for _, dir := range []string{"/mnt", "/media", "/opt"} {
+		if fi, err := os.Stat(dir); err == nil && fi.IsDir() {
+			paths = append(paths, dir)
+		}
+	}
+
+	return paths
 }
 
 // LoadCustomScanPaths reads custom scan paths from the config file.

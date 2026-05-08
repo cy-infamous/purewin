@@ -12,7 +12,7 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/lakshaymaurya-felt/purewin/internal/core"
+	"github.com/cy-infamous/purewin/internal/core"
 )
 
 const (

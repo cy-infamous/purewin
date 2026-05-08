@@ -5,10 +5,10 @@ import (
 	"sort"
 	"time"
 
-	"github.com/lakshaymaurya-felt/purewin/internal/core"
-	"github.com/lakshaymaurya-felt/purewin/internal/installer"
-	"github.com/lakshaymaurya-felt/purewin/internal/ui"
-	"github.com/lakshaymaurya-felt/purewin/internal/util"
+	"github.com/cy-infamous/purewin/internal/core"
+	"github.com/cy-infamous/purewin/internal/installer"
+	"github.com/cy-infamous/purewin/internal/ui"
+	"github.com/cy-infamous/purewin/internal/util"
 	"github.com/spf13/cobra"
 )
 

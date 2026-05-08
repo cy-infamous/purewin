@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"os/exec"
 
-	"github.com/lakshaymaurya-felt/purewin/internal/ui"
+	"github.com/cy-infamous/purewin/internal/ui"
 )
 
 func RunBatchUninstall(apps []InstalledApp, dryRun bool) error {

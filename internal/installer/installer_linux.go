@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/lakshaymaurya-felt/purewin/internal/core"
+	"github.com/cy-infamous/purewin/internal/core"
 )
 
 // InstallerFile represents a detected installer or archive file.

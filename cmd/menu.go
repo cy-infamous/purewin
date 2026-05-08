@@ -7,8 +7,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/lakshaymaurya-felt/purewin/internal/core"
-	"github.com/lakshaymaurya-felt/purewin/internal/ui"
+	"github.com/cy-infamous/purewin/internal/core"
+	"github.com/cy-infamous/purewin/internal/ui"
 )
 
 // ─── Menu Item Definitions ───────────────────────────────────────────────────

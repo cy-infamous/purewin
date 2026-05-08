@@ -8,7 +8,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/lakshaymaurya-felt/purewin/pkg/whitelist"
+	"github.com/cy-infamous/purewin/pkg/whitelist"
 )
 
 // ─── Multi-Drive Scanning ────────────────────────────────────────────────────

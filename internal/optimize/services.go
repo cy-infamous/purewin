@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/lakshaymaurya-felt/purewin/internal/core"
+	"github.com/cy-infamous/purewin/internal/core"
 )
 
 const (

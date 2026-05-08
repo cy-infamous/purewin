@@ -145,9 +145,9 @@ func CollectMetrics(prevNet *NetworkMetrics, interval time.Duration) (*SystemMet
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		// Use a small measurement window — cpu.Percent(0) on Windows
-		// can return 0 on the first call because there's no prior sample.
+		_, _ = cpu.Percent(0, false)
 		total, _ := cpu.Percent(200*time.Millisecond, false)
+		_, _ = cpu.Percent(0, true)
 		perCore, _ := cpu.Percent(200*time.Millisecond, true)
 		infos, _ := cpu.Info()
 

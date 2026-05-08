@@ -10,10 +10,10 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
 
-	"github.com/lakshaymaurya-felt/purewin/internal/core"
-	"github.com/lakshaymaurya-felt/purewin/internal/shell"
-	"github.com/lakshaymaurya-felt/purewin/internal/ui"
-	"github.com/lakshaymaurya-felt/purewin/internal/update"
+	"github.com/cy-infamous/purewin/internal/core"
+	"github.com/cy-infamous/purewin/internal/shell"
+	"github.com/cy-infamous/purewin/internal/ui"
+	"github.com/cy-infamous/purewin/internal/update"
 )
 
 var (
@@ -22,6 +22,7 @@ var (
 	dryRun   bool
 	runAdmin bool
 	noColor  bool
+	autoYes  bool
 
 	// Version info populated from main
 	appVersion = "dev"
@@ -79,12 +80,16 @@ func init() {
 	rootCmd.PersistentFlags().BoolVar(&debug, "debug", false, "Show detailed operation logs")
 	rootCmd.PersistentFlags().BoolVar(&runAdmin, "admin", false, "Re-launch PureWin with elevated privileges")
 	rootCmd.PersistentFlags().BoolVar(&noColor, "no-color", false, "Disable colored output")
+	rootCmd.PersistentFlags().BoolVarP(&autoYes, "yes", "y", false, "Skip confirmation prompts (non-interactive mode)")
 
 	// PersistentPreRun: if --admin is set, re-launch elevated and exit.
 	rootCmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
-		// Handle --no-color flag
 		if noColor {
 			os.Setenv("NO_COLOR", "1")
+		}
+
+		if autoYes {
+			ui.SetAutoYes(true)
 		}
 
 		if !runAdmin {

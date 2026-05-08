@@ -9,8 +9,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/lakshaymaurya-felt/purewin/internal/core"
-	"github.com/lakshaymaurya-felt/purewin/pkg/whitelist"
+	"github.com/cy-infamous/purewin/internal/core"
+	"github.com/cy-infamous/purewin/pkg/whitelist"
 )
 
 // ─── Developer Cache Definitions ─────────────────────────────────────────────

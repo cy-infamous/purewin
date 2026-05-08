@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/lakshaymaurya-felt/purewin/pkg/whitelist"
+	"github.com/cy-infamous/purewin/pkg/whitelist"
 )
 
 // ─── Browser Definitions ─────────────────────────────────────────────────────
@@ -85,6 +85,28 @@ func ScanBrowserCaches(wl *whitelist.Whitelist) []CleanItem {
 	// Firefox uses a different profile structure.
 	firefoxItems := scanFirefoxCaches(local, wl)
 	items = append(items, firefoxItems...)
+
+	if len(items) == 0 {
+		for _, b := range browsers {
+			if _, err := os.Stat(b.base); err == nil {
+				items = append(items, CleanItem{
+					Path:        b.base,
+					Size:        0,
+					Category:    "browser",
+					Description: b.name + " cache (empty — already clean)",
+				})
+			}
+		}
+		profilesDir := filepath.Join(local, "Mozilla", "Firefox", "Profiles")
+		if _, err := os.Stat(profilesDir); err == nil {
+			items = append(items, CleanItem{
+				Path:        profilesDir,
+				Size:        0,
+				Category:    "browser",
+				Description: "Firefox cache (empty — already clean)",
+			})
+		}
+	}
 
 	return items
 }

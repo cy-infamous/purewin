@@ -171,7 +171,7 @@ func ShowBrandBanner() string {
 	b.WriteString(MutedStyle().Italic(true).Render("  " + tagline))
 	b.WriteByte('\n')
 
-	b.WriteString(InfoStyle().Render("  https://github.com/lakshaymaurya-felt/purewin"))
+	b.WriteString(InfoStyle().Render("  https://github.com/cy-infamous/purewin"))
 	b.WriteByte('\n')
 
 	return b.String()

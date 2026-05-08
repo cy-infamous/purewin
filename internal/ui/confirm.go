@@ -16,7 +16,19 @@ import (
 // Default is No (pressing Enter without input returns false).
 //
 //	"Proceed with cleanup? [y/N]: "
+var skipConfirmations bool
+
+func SetAutoYes(v bool) {
+	skipConfirmations = v
+}
+
 func Confirm(message string) (bool, error) {
+	if skipConfirmations {
+		fmt.Printf("%s %s\n",
+			BoldStyle().Render(message),
+			MutedStyle().Render("[auto-confirmed with --yes]"))
+		return true, nil
+	}
 	promptStyle := BoldStyle()
 	hintStyle := MutedStyle()
 
@@ -43,6 +55,13 @@ func Confirm(message string) (bool, error) {
 //
 // The message is rendered in red with a warning icon and a bordered panel.
 func DangerConfirm(message string) (bool, error) {
+	if skipConfirmations {
+		fmt.Printf("  %s  %s %s\n",
+			IconWarning,
+			message,
+			MutedStyle().Render("[auto-confirmed with --yes]"))
+		return true, nil
+	}
 	warnTag := TagErrorStyle().Render(" " + IconWarning + " WARNING ")
 
 	dangerMsg := lipgloss.NewStyle().

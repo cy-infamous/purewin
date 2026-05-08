@@ -8,7 +8,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/lakshaymaurya-felt/purewin/internal/envutil"
+	"github.com/cy-infamous/purewin/internal/envutil"
 )
 
 // defaultPatterns are the initial whitelist entries that protect common
@@ -115,7 +115,7 @@ func validatePattern(pattern string) error {
 	// 3. Require at least 2 path separators to avoid overly broad patterns.
 	sepCount := strings.Count(cleaned, `\`) + strings.Count(cleaned, "/")
 	if sepCount < 2 {
-		return fmt.Errorf("pattern has fewer than 2 path separators and is too broad: %s", pattern)
+		return fmt.Errorf("path too broad: %q could accidentally protect too many files.\n  Use a more specific path with at least 2 separators (e.g., C:\\Users\\Name\\Project)", pattern)
 	}
 
 	return nil

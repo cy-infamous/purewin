@@ -7,9 +7,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/lakshaymaurya-felt/purewin/internal/config"
-	"github.com/lakshaymaurya-felt/purewin/internal/ui"
-	"github.com/lakshaymaurya-felt/purewin/pkg/whitelist"
+	"github.com/cy-infamous/purewin/internal/config"
+	"github.com/cy-infamous/purewin/internal/ui"
+	"github.com/cy-infamous/purewin/pkg/whitelist"
 )
 
 var whitelistCmd = &cobra.Command{

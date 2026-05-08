@@ -10,11 +10,11 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
 
-	"github.com/lakshaymaurya-felt/purewin/internal/clean"
-	"github.com/lakshaymaurya-felt/purewin/internal/config"
-	"github.com/lakshaymaurya-felt/purewin/internal/core"
-	"github.com/lakshaymaurya-felt/purewin/internal/ui"
-	"github.com/lakshaymaurya-felt/purewin/pkg/whitelist"
+	"github.com/cy-infamous/purewin/internal/clean"
+	"github.com/cy-infamous/purewin/internal/config"
+	"github.com/cy-infamous/purewin/internal/core"
+	"github.com/cy-infamous/purewin/internal/ui"
+	"github.com/cy-infamous/purewin/pkg/whitelist"
 )
 
 var cleanCmd = &cobra.Command{
@@ -179,10 +179,19 @@ func runClean(cmd *cobra.Command, args []string) {
 	totalSize := clean.TotalSizeAll(allResults) + recycleBinSize + goModSize + windowsOldSize
 	totalItems := clean.TotalItemCount(allResults)
 
-	if totalSize == 0 {
+	if totalSize == 0 && totalItems == 0 {
 		fmt.Println()
 		fmt.Println(ui.SuccessStyle().Render(
 			fmt.Sprintf("  %s  System is clean! Nothing to remove.", ui.IconSuccess)))
+		fmt.Println()
+		return
+	}
+
+	if totalSize == 0 && totalItems > 0 {
+		fmt.Println()
+		displayCleanResults(allResults, recycleBinSize, goModSize, windowsOldSize)
+		fmt.Println(ui.SuccessStyle().Render(
+			fmt.Sprintf("  %s  All scanned locations are already clean!", ui.IconSuccess)))
 		fmt.Println()
 		return
 	}
@@ -449,9 +458,10 @@ func displayCleanResults(
 				)
 			}
 			if clean.IsDockerAvailable() {
+				dockerSize := clean.DockerBuildCacheSize()
 				fmt.Printf("    %-31s  %10s  %s\n",
 					"Docker build cache",
-					ui.MutedStyle().Render("   ?"),
+					ui.FormatSize(dockerSize),
 					ui.MutedStyle().Render("(docker builder prune)"),
 				)
 			}

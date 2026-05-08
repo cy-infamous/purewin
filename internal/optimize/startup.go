@@ -7,7 +7,7 @@ import (
 
 	"golang.org/x/sys/windows/registry"
 
-	"github.com/lakshaymaurya-felt/purewin/internal/ui"
+	"github.com/cy-infamous/purewin/internal/ui"
 )
 
 // StartupItem represents an application configured to run at startup.
@@ -136,12 +136,7 @@ func ListStartupItems() {
 
 		fmt.Printf("  %s  %-30s  %s\n", status, name, loc)
 
-		// Show command on the next line, truncated for readability.
-		cmd := item.Command
-		if len(cmd) > 70 {
-			cmd = cmd[:67] + "..."
-		}
-		fmt.Printf("         %s\n", ui.MutedStyle().Render(cmd))
+		fmt.Printf("         %s\n", ui.MutedStyle().Render(item.Command))
 	}
 
 	fmt.Println()

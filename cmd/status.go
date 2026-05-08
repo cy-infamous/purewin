@@ -7,8 +7,8 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/lakshaymaurya-felt/purewin/internal/status"
-	"github.com/lakshaymaurya-felt/purewin/internal/ui"
+	"github.com/cy-infamous/purewin/internal/status"
+	"github.com/cy-infamous/purewin/internal/ui"
 	"github.com/spf13/cobra"
 )
 

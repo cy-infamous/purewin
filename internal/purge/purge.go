@@ -10,7 +10,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/lakshaymaurya-felt/purewin/internal/core"
+	"github.com/cy-infamous/purewin/internal/core"
 )
 
 // ProjectArtifact represents a build artifact found in a project directory.
@@ -271,14 +271,28 @@ func GetDefaultScanPaths() []string {
 		userProfile = os.Getenv("HOME")
 	}
 
-	return []string{
+	paths := []string{
 		filepath.Join(userProfile, "Projects"),
 		filepath.Join(userProfile, "GitHub"),
 		filepath.Join(userProfile, "dev"),
 		filepath.Join(userProfile, "Code"),
 		filepath.Join(userProfile, "workspace"),
 		filepath.Join(userProfile, "Documents"),
+		filepath.Join(userProfile, "Desktop"),
 	}
+
+	systemDrive := strings.ToUpper(os.Getenv("SYSTEMDRIVE"))
+	for _, letter := range "DEFGHIJ" {
+		drive := string(letter) + ":\\"
+		if strings.ToUpper(string(letter)+":") == systemDrive {
+			continue
+		}
+		if fi, err := os.Stat(drive); err == nil && fi.IsDir() {
+			paths = append(paths, drive)
+		}
+	}
+
+	return paths
 }
 
 // LoadCustomScanPaths reads custom scan paths from the config file.
